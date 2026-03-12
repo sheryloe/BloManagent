@@ -1,0 +1,11 @@
+node_modules
+dist
+coverage
+.vite
+.DS_Store
+.env
+data
+*.tsbuildinfo
+apps/web/dist
+apps/server/dist
+packages/shared/dist

@@ -1,0 +1,19 @@
+{
+  "name": "blog-review-dashboard",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run build --workspace @blog-review/shared && concurrently \"npm run dev --workspace @blog-review/server\" \"npm run dev --workspace @blog-review/web\"",
+    "build": "npm run build --workspace @blog-review/shared && npm run build --workspace @blog-review/server && npm run build --workspace @blog-review/web",
+    "start": "npm run start --workspace @blog-review/server",
+    "test": "npm run test --workspace @blog-review/shared && npm run test --workspace @blog-review/server && npm run test --workspace @blog-review/web"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "typescript": "^5.8.2"
+  }
+}
