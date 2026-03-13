@@ -1,0 +1,11 @@
+{
+  "name": "BloManagent",
+  "short_name": "BloManagent",
+  "description": "로컬 퍼스트 블로그 분석과 AI 해석을 위한 운영 대시보드",
+  "lang": "ko-KR",
+  "start_url": "https://sheryloe.github.io/BloManagent/",
+  "scope": "https://sheryloe.github.io/BloManagent/",
+  "display": "standalone",
+  "background_color": "#f4eddc",
+  "theme_color": "#8b5cf6"
+}

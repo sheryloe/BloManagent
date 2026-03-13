@@ -1,76 +1,298 @@
 <!doctype html>
 <html lang="ko">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>BloManagent | 로컬 퍼스트 블로그 분석 대시보드</title>
-  <meta name="description" content="티스토리, 네이버 블로그, Blogger 계열 블로그를 수집하고 주간 단위로 비교 분석하기 위한 로컬 우선 대시보드입니다.">
-  <meta name="keywords" content="blog analytics dashboard, local first blog analysis, tistory naver blogger analytics, 블로그 분석 대시보드, 로컬 퍼스트 블로그 분석">
-  <meta name="robots" content="index,follow,max-image-preview:large">
-  <link rel="canonical" href="https://sheryloe.github.io/BloManagent/">
-  <meta property="og:type" content="website">
-  <meta property="og:title" content="BloManagent">
-  <meta property="og:description" content="티스토리, 네이버 블로그, Blogger 계열 블로그를 수집하고 주간 단위로 비교 분석하기 위한 로컬 우선 대시보드입니다.">
-  <meta property="og:url" content="https://sheryloe.github.io/BloManagent/">
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="BloManagent">
-  <meta name="twitter:description" content="티스토리, 네이버 블로그, Blogger 계열 블로그를 수집하고 주간 단위로 비교 분석하기 위한 로컬 우선 대시보드입니다.">
-  <meta name="theme-color" content="#2563eb">
-  <link rel="stylesheet" href="./styles.css">
-  <script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "SoftwareSourceCode", "name": "BloManagent", "codeRepository": "https://github.com/sheryloe/BloManagent", "description": "티스토리, 네이버 블로그, Blogger 계열 블로그를 수집하고 주간 단위로 비교 분석하기 위한 로컬 우선 대시보드입니다.", "programmingLanguage": "Node.js", "url": "https://sheryloe.github.io/BloManagent/", "keywords": "blog analytics dashboard, local first blog analysis, tistory naver blogger analytics, 블로그 분석 대시보드, 로컬 퍼스트 블로그 분석"}, {"@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "BloManagent는 무엇을 분석하나요?", "acceptedAnswer": {"@type": "Answer", "text": "티스토리, 네이버 블로그, Blogger 계열 블로그의 변화 추이와 게시물 흐름을 분석합니다."}}, {"@type": "Question", "name": "왜 로컬 퍼스트인가요?", "acceptedAnswer": {"@type": "Answer", "text": "블로그 데이터와 분석 이력을 내 PC 또는 내부 환경에 쌓아두는 운영 방식을 우선하기 때문입니다."}}, {"@type": "Question", "name": "AI 제공자는 어떤 것을 쓰나요?", "acceptedAnswer": {"@type": "Answer", "text": "OpenAI, Google AI Studio, Ollama 같은 옵션을 고려한 구조입니다."}}]}]}</script>
-</head>
-<body>
-  <main class="shell">
-    <section class="hero">
-      <span class="eyebrow">Project Landing Page</span>
-      <div>
-        <h1>BloManagent</h1>
-        <p class="lead">티스토리, 네이버 블로그, Blogger 계열 블로그를 수집하고 주간 단위로 비교 분석하기 위한 로컬 우선 대시보드입니다.</p>
-      </div>
-      <div class="cta-row">
-        <a class="primary" href="https://github.com/sheryloe/BloManagent">GitHub Repository</a>
-        <a href="https://sheryloe.github.io/">Project Hub</a>
-      </div>
-      <div class="meta-row">
-        <span class="meta-chip">로컬 퍼스트 블로그 분석 대시보드</span>
-        <span class="meta-chip">여러 블로그를 동시에 운영하며 로컬에서 분석을 축적하고 싶은 사용자</span>
-      </div>
-      <div class="chip-row"><span class="chip">blog analytics dashboard</span><span class="chip">local first blog analysis</span><span class="chip">tistory naver blogger analytics</span><span class="chip">블로그 분석 대시보드</span><span class="chip">로컬 퍼스트 블로그 분석</span></div>
-    </section>
-    <section class="section">
-      <h2>Why This Project Exists</h2>
-      <p>블로그 운영 데이터를 플랫폼별로 따로 관리하면 성장 추이, 주간 비교, AI 요약, 보조 지표 추적이 느리고 번거롭습니다.</p>
-      <div class="cards"><article class="card"><h3>Feature</h3><p>메인 URL 기반 수집과 주간 비교 분석 흐름</p></article><article class="card"><h3>Feature</h3><p>OpenAI, Google AI Studio, Ollama를 선택할 수 있는 분석 구조</p></article><article class="card"><h3>Feature</h3><p>모노레포 기반 서버/웹/공유 패키지 구성</p></article><article class="card"><h3>Feature</h3><p>로컬 실행과 데이터 축적을 우선하는 설계</p></article></div>
-    </section>
-    <section class="section split">
-      <div class="stack">
-        <div>
-          <h2>Workflow</h2>
-          <ul class="clean"><li>블로그 메인 URL 등록</li><li>주간 단위 수집 및 분석 실행</li><li>대시보드에서 변화량과 AI 해석 비교</li></ul>
-        </div>
-        <div>
-          <h2>Tech Stack</h2>
-          <ul class="clean"><li>Node.js</li><li>TypeScript</li><li>npm workspaces</li><li>Server/Web monorepo</li></ul>
-        </div>
-      </div>
-      <div class="flow">
-        <div>
-          <h2>Quick Start</h2>
-          <pre>`npm install` 후 `npm run dev`로 서버와 웹을 함께 실행합니다.
-프로덕션 점검 시 `npm run build`와 `npm run start`를 사용합니다.
-로컬 환경 변수는 `.env.example`을 기준으로 맞춥니다.</pre>
-        </div>
-      </div>
-    </section>
-    <section class="section">
-      <h2>Repository Structure</h2>
-      <ul class="clean"><li>`apps/`: 서버와 웹 애플리케이션</li><li>`packages/`: 공용 로직</li><li>`docs/`: 백테스트와 운영 문서</li></ul>
-    </section>
-    <section class="section">
-      <h2>FAQ</h2>
-      <div class="cards"><article class="faq-item"><h3>BloManagent는 무엇을 분석하나요?</h3><p>티스토리, 네이버 블로그, Blogger 계열 블로그의 변화 추이와 게시물 흐름을 분석합니다.</p></article><article class="faq-item"><h3>왜 로컬 퍼스트인가요?</h3><p>블로그 데이터와 분석 이력을 내 PC 또는 내부 환경에 쌓아두는 운영 방식을 우선하기 때문입니다.</p></article><article class="faq-item"><h3>AI 제공자는 어떤 것을 쓰나요?</h3><p>OpenAI, Google AI Studio, Ollama 같은 옵션을 고려한 구조입니다.</p></article></div>
-    </section>
-    <p class="footer">Last updated: 2026-03-12 · Owner: sheryloe</p>
-  </main>
-</body>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>BloManagent | 로컬 퍼스트 블로그 분석과 AI 해석을 위한 운영 대시보드</title>
+    <meta
+      name="description"
+      content="티스토리, 네이버 블로그, Blogger 계열 블로그를 수집하고 주간 단위로 비교 분석하는 로컬 퍼스트 블로그 분석 프로젝트입니다."
+    >
+    <meta
+      name="keywords"
+      content="blog analytics dashboard, local first blog analysis, tistory naver blogger analytics, 블로그 분석 대시보드, 로컬 퍼스트 블로그 분석"
+    >
+    <meta name="robots" content="index, follow, max-image-preview:large">
+    <meta name="googlebot" content="index, follow, max-image-preview:large">
+    <meta name="theme-color" content="#8b5cf6">
+    <meta property="og:type" content="website">
+    <meta property="og:locale" content="ko_KR">
+    <meta property="og:site_name" content="BloManagent">
+    <meta property="og:title" content="BloManagent | 로컬 퍼스트 블로그 분석과 AI 해석을 위한 운영 대시보드">
+    <meta
+      property="og:description"
+      content="여러 블로그의 변화를 주간 단위로 수집하고, AI 해석까지 묶어 읽을 수 있게 설계한 로컬 퍼스트 분석 저장소입니다."
+    >
+    <meta property="og:url" content="https://sheryloe.github.io/BloManagent/">
+    <meta
+      property="og:image"
+      content="https://sheryloe.github.io/BloManagent/assets/screenshots/blomanagent-cover.png"
+    >
+    <meta property="og:image:alt" content="BloManagent 블로그형 소개 페이지 커버">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="BloManagent">
+    <meta
+      name="twitter:description"
+      content="블로그 수집, 주간 비교, AI 분석을 묶은 로컬 퍼스트 운영 대시보드 프로젝트"
+    >
+    <meta
+      name="twitter:image"
+      content="https://sheryloe.github.io/BloManagent/assets/screenshots/blomanagent-cover.png"
+    >
+    <link rel="canonical" href="https://sheryloe.github.io/BloManagent/">
+    <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+    <link rel="manifest" href="site.webmanifest">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800&family=Outfit:wght@500;600;700;800&display=swap"
+      rel="stylesheet"
+    >
+    <link rel="stylesheet" href="./styles.css">
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "SoftwareSourceCode",
+            "name": "BloManagent",
+            "codeRepository": "https://github.com/sheryloe/BloManagent",
+            "url": "https://sheryloe.github.io/BloManagent/",
+            "programmingLanguage": "Node.js, TypeScript, npm workspaces",
+            "description": "티스토리, 네이버 블로그, Blogger 계열 블로그를 수집하고 주간 단위로 비교 분석하는 로컬 퍼스트 블로그 분석 프로젝트입니다.",
+            "keywords": "blog analytics dashboard, local first blog analysis, tistory naver blogger analytics, 블로그 분석 대시보드, 로컬 퍼스트 블로그 분석"
+          },
+          {
+            "@type": "FAQPage",
+            "mainEntity": [
+              {
+                "@type": "Question",
+                "name": "BloManagent는 무엇을 분석하나요?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "티스토리, 네이버 블로그, Blogger 계열 블로그의 변화 추이와 게시물 흐름을 주간 단위로 분석합니다."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "왜 로컬 퍼스트 구조인가요?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "분석 이력과 운영 데이터를 PC 또는 내부 환경에 가깝게 두어 반복 비교와 추적을 편하게 하기 위해서입니다."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "AI 분석은 어떤 옵션을 고려하나요?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "OpenAI, Google AI Studio, Ollama 같은 옵션을 고려한 구조입니다."
+                }
+              }
+            ]
+          }
+        ]
+      }
+    </script>
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="topbar">
+        <a class="brand" href="#top">
+          <span class="brand-mark">BM</span>
+          <span class="brand-text">
+            <strong>BloManagent</strong>
+            <span>Local-first blog analytics</span>
+          </span>
+        </a>
+        <nav class="topnav" aria-label="페이지 이동">
+          <a href="#features">특징</a>
+          <a href="#workflow">구성</a>
+          <a href="#notes">분석 포인트</a>
+          <a href="#faq">FAQ</a>
+          <a href="https://github.com/sheryloe/BloManagent">GitHub</a>
+        </nav>
+      </header>
+
+      <main id="top">
+        <section class="hero">
+          <div class="hero-copy">
+            <p class="eyebrow">Blog analytics workspace</p>
+            <h1>여러 블로그의 변화를<br>주간 단위로 수집하고<br>AI 해석까지 묶기</h1>
+            <p class="hero-body">
+              BloManagent는 여러 블로그를 동시에 운영할 때 흩어지기 쉬운 변화 추이와 게시물 흐름을
+              로컬 퍼스트 구조 안에서 비교하고 해석하기 위해 만든 프로젝트입니다. 단순한 조회수 패널이 아니라,
+              수집기와 SQLite 스키마, AI 분석 파이프라인, 대시보드가 어떻게 이어지는지를 블로그 글처럼 설명하는 페이지로 바꿨습니다.
+            </p>
+            <div class="hero-actions">
+              <a class="button primary" href="https://github.com/sheryloe/BloManagent">GitHub 저장소 보기</a>
+              <a class="button secondary" href="https://sheryloe.github.io/">프로젝트 허브로 이동</a>
+            </div>
+            <ul class="hero-meta">
+              <li>티스토리 · 네이버 · Blogger</li>
+              <li>주간 비교 분석</li>
+              <li>AI 요약과 해석 파이프라인</li>
+            </ul>
+          </div>
+
+          <div class="hero-visual" aria-label="BloManagent 분석 구조">
+            <figure class="visual-card visual-main visual-note">
+              <span class="note-badge">Local-first</span>
+              <strong>분석 이력과 수집 데이터를 가까이에 두고 반복 비교하기</strong>
+              <p>블로그 운영 데이터가 외부 서비스 안에만 머무르면 주간 비교와 운영 회고가 불편해집니다. 이 저장소는 로컬 퍼스트 구조를 통해 비교 가능한 분석 루프를 만드는 데 집중합니다.</p>
+              <div class="metric-row">
+                <span class="metric-chip">Node.js</span>
+                <span class="metric-chip">TypeScript</span>
+                <span class="metric-chip">SQLite</span>
+                <span class="metric-chip">Monorepo</span>
+              </div>
+              <ul class="note-list">
+                <li>메인 URL 기반 수집과 주간 비교 분석</li>
+                <li>AI 모델 옵션을 바꿔가며 해석 확장</li>
+                <li>문서와 실행 구조를 함께 남기는 운영형 저장소</li>
+              </ul>
+            </figure>
+            <figure class="visual-card visual-side visual-note">
+              <span class="note-badge">Models</span>
+              <strong>OpenAI · Google AI Studio · Ollama</strong>
+              <p>단일 모델에 잠기지 않고, 해석 파이프라인을 바꿔 보며 비교하기 쉬운 구조를 지향합니다.</p>
+            </figure>
+            <div class="visual-caption">
+              <strong>수집, 비교, 해석이 하나의 분석 루프로 이어집니다</strong>
+              <p>데이터를 모으는 단계와 AI 해석 단계를 분리하지 않고, 운영자가 다시 돌아와 읽기 좋은 문서형 페이지로 정리했습니다.</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="feature-strip" id="features">
+          <article>
+            <span>01</span>
+            <h2>기획 배경과 로컬 퍼스트 아키텍처</h2>
+            <p>블로그 분석 이력을 누적하고 주간 단위로 비교하기 쉬운 구조를 먼저 설계했습니다.</p>
+          </article>
+          <article>
+            <span>02</span>
+            <h2>SQLite 스키마와 수집기 중심 설계</h2>
+            <p>분석 품질보다 먼저 데이터 축적 구조를 명확히 해 반복 수집과 비교가 쉬워지도록 했습니다.</p>
+          </article>
+          <article>
+            <span>03</span>
+            <h2>AI 분석 파이프라인과 대시보드 연결</h2>
+            <p>수집 데이터, AI 해석, 주간 비교 결과를 한 페이지 서사처럼 읽히도록 공개용 페이지를 구성했습니다.</p>
+          </article>
+        </section>
+
+        <section class="workflow" id="workflow">
+          <div class="section-heading">
+            <p class="eyebrow">Chapters</p>
+            <h2>프로젝트가 확장된 순서를 그대로 보여 주는 4단계</h2>
+            <p class="section-body">
+              Notion 문서 스텝 구조를 따라가면 이 저장소가 단순 분석 툴이 아니라 장기 운영을 위한 비교 관찰 도구라는 점이 자연스럽게 드러납니다.
+            </p>
+          </div>
+          <div class="workflow-grid">
+            <article class="workflow-card">
+              <strong>1. 기획 배경과 로컬 퍼스트 아키텍처 설계</strong>
+              <p>왜 분석 데이터를 가까이에 두는 구조를 먼저 고정했는지 설명합니다.</p>
+            </article>
+            <article class="workflow-card">
+              <strong>2. SQLite 스키마와 블로그 수집기 구현 과정</strong>
+              <p>비교 가능한 데이터를 꾸준히 쌓는 것이 기능 추가보다 먼저라는 판단이 드러나는 단계입니다.</p>
+            </article>
+            <article class="workflow-card">
+              <strong>3. AI 분석 파이프라인과 대시보드 구현 과정</strong>
+              <p>수집된 데이터를 해석 가능한 인사이트로 바꾸는 흐름을 설명합니다.</p>
+            </article>
+            <article class="workflow-card">
+              <strong>4. 테스트, 빌드, Windows 실행, 향후 확장 전략</strong>
+              <p>운영형 저장소답게 실행 환경과 다음 단계 확장 포인트까지 공개합니다.</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="screenshots" id="notes">
+          <div class="section-heading">
+            <p class="eyebrow">Analysis notes</p>
+            <h2>분석 페이지가 강조하는 실제 운영 포인트</h2>
+            <p class="section-body">
+              스크린샷보다 먼저 드러나야 하는 수집-비교-해석 루프를 카드 형태로 정리해, 검색 유입 사용자가 구조를 빠르게 이해할 수 있게 했습니다.
+            </p>
+          </div>
+          <div class="flow-banner">
+            <article class="flow-step">
+              <span>STEP 1</span>
+              <strong>메인 URL을 등록하고 수집 주기를 정합니다</strong>
+              <p>여러 블로그의 기준 URL을 같은 구조로 관리해 주간 비교가 가능하게 만듭니다.</p>
+            </article>
+            <article class="flow-step">
+              <span>STEP 2</span>
+              <strong>AI 해석과 대시보드 비교를 함께 봅니다</strong>
+              <p>수치만 보는 것이 아니라 변화 원인과 운영 해석을 같이 읽는 흐름이 핵심입니다.</p>
+            </article>
+          </div>
+          <div class="workflow-grid">
+            <article class="workflow-card">
+              <strong>Quick start</strong>
+              <p>`npm install` 후 `npm run dev`, 배포 전에는 `npm run build`와 `npm run start`를 사용합니다.</p>
+            </article>
+            <article class="workflow-card">
+              <strong>Repository structure</strong>
+              <p>`apps/`, `packages/`, `docs/`로 나누어 서버와 웹, 공용 로직, 문서를 구분합니다.</p>
+            </article>
+            <article class="workflow-card">
+              <strong>Audience</strong>
+              <p>여러 블로그를 동시에 운영하며 로그 기반으로 추세를 비교하고 싶은 사용자에게 맞춘 구조입니다.</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="seo-copy">
+          <div class="section-heading">
+            <p class="eyebrow">Search intent</p>
+            <h2>블로그 분석 검색 의도에 맞춘 문장과 구조</h2>
+          </div>
+          <div class="seo-grid">
+            <article>
+              <h3>국문 키워드</h3>
+              <p>블로그 분석 대시보드, 로컬 퍼스트 블로그 분석, 주간 비교 분석 같은 검색어를 본문 안에 직접 녹였습니다.</p>
+            </article>
+            <article>
+              <h3>영문 키워드</h3>
+              <p>blog analytics dashboard, local first blog analysis, tistory naver blogger analytics를 함께 대응합니다.</p>
+            </article>
+            <article>
+              <h3>노출 구조</h3>
+              <p>FAQ와 구조화 데이터를 같이 넣어 단순 프로젝트 목록 페이지가 아니라 설명형 랜딩으로 보이게 만들었습니다.</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="faq" id="faq">
+          <div class="section-heading">
+            <p class="eyebrow">FAQ</p>
+            <h2>자주 묻는 질문</h2>
+          </div>
+          <div class="faq-list">
+            <details open>
+              <summary>BloManagent는 무엇을 분석하나요?</summary>
+              <p>티스토리, 네이버 블로그, Blogger 계열 블로그의 변화 추이와 게시물 흐름을 주간 단위로 분석합니다.</p>
+            </details>
+            <details>
+              <summary>왜 로컬 퍼스트 구조인가요?</summary>
+              <p>분석 이력과 운영 데이터를 PC 또는 내부 환경에 가깝게 두어 반복 비교와 추적을 편하게 하기 위해서입니다.</p>
+            </details>
+            <details>
+              <summary>AI 분석은 어떤 옵션을 고려하나요?</summary>
+              <p>OpenAI, Google AI Studio, Ollama 같은 옵션을 고려한 구조입니다.</p>
+            </details>
+          </div>
+        </section>
+      </main>
+
+      <footer class="footer">
+        <span>Last updated: 2026-03-13</span>
+        <a href="https://github.com/sheryloe/BloManagent">Repository</a>
+      </footer>
+    </div>
+  </body>
 </html>
