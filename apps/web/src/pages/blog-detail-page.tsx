@@ -34,6 +34,7 @@ export function BlogDetailPage() {
           <p className="eyebrow">{data.blog.platform}</p>
           <h2>{data.blog.name}</h2>
           <p className="muted">{data.blog.mainUrl}</p>
+          <p className="muted">수집 글 수는 검증된 전체 공개 글 기준이며 홈 최신 글 수와 다를 수 있습니다.</p>
         </div>
         <TrendSparkline points={data.scoreHistory} />
       </section>

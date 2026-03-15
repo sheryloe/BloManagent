@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import {
   calculateQualityComponents,
   postAnalysisSchema,
@@ -28,7 +28,7 @@ import { average, createId, daysAgo, limitText, nowIso, safeJsonParse } from "..
 import { getProvider } from "../providers";
 import type { AnalyzePostInput, ProviderSettingsRow } from "../providers/types";
 import { weeklySummaryMarkdown } from "../templates/prompts";
-import { assertBlogCrawlAllowed, discoverBlogPosts, getBlog, listBlogs } from "./blog-service";
+import { VERIFIED_CRAWL_STATUS, assertBlogCrawlAllowed, discoverBlogPosts, getBlog, listBlogs } from "./blog-service";
 import { heuristicAnalysisSummary, heuristicPostAnalysis, heuristicRecommendations } from "./heuristics";
 import { getProviderSettingRow, resolveProviderSetting } from "./settings-service";
 
@@ -401,7 +401,11 @@ class AnalysisCoordinator {
     insertedPostIds: string[],
     updatedPostIds: string[],
   ) {
-    let rows = await db.select().from(posts).where(eq(posts.blogId, blogId)).orderBy(desc(posts.publishedAt), desc(posts.createdAt));
+    let rows = await db
+      .select()
+      .from(posts)
+      .where(and(eq(posts.blogId, blogId), eq(posts.crawlStatus, VERIFIED_CRAWL_STATUS)))
+      .orderBy(desc(posts.publishedAt), desc(posts.createdAt));
 
     if (input.runScope === "selected" && input.selectedPostIds?.length) {
       rows = rows.filter((row) => input.selectedPostIds?.includes(row.id));
@@ -473,7 +477,23 @@ export const getDashboard = async (): Promise<DashboardResponse> => {
   const blogs = await listBlogs();
   const latestRuns = await listRuns();
   const latestRecommendations = sqlite
-    .prepare("SELECT * FROM recommendations ORDER BY created_at DESC LIMIT 10")
+    .prepare(
+      `
+      SELECT r.*
+      FROM recommendations r
+      JOIN weekly_reports wr ON wr.id = r.weekly_report_id
+      JOIN analysis_runs ar ON ar.id = wr.run_id
+      WHERE EXISTS (
+        SELECT 1
+        FROM post_analyses pa
+        JOIN posts p ON p.id = pa.post_id
+        WHERE pa.run_id = ar.id
+          AND COALESCE(p.crawl_status, 'verified') = 'verified'
+      )
+      ORDER BY r.created_at DESC
+      LIMIT 10
+      `,
+    )
     .all() as Array<Record<string, unknown>>;
   const latestPostRows = sqlite
     .prepare(
@@ -497,7 +517,7 @@ export const getDashboard = async (): Promise<DashboardResponse> => {
         b.name as blog_name
       FROM post_analyses pa
       JOIN analysis_runs ar ON ar.id = pa.run_id
-      JOIN posts p ON p.id = pa.post_id
+      JOIN posts p ON p.id = pa.post_id AND COALESCE(p.crawl_status, 'verified') = 'verified'
       JOIN blogs b ON b.id = p.blog_id
       WHERE ar.status = 'completed'
       ORDER BY pa.created_at DESC

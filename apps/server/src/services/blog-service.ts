@@ -10,6 +10,19 @@ import { getAppSettings } from "./settings-service";
 
 const NAVER_POLICY_MESSAGE =
   "naver_opt_in_required: Naver public crawl is disabled by default. Enable it in Settings if you understand the policy risk.";
+export const VERIFIED_CRAWL_STATUS = "verified";
+export const EXCLUDED_CRAWL_STATUS = "excluded";
+
+type CrawlStatus = typeof VERIFIED_CRAWL_STATUS | typeof EXCLUDED_CRAWL_STATUS;
+type DiscoverySourceName = "rss" | "sitemap" | "main" | "wp-json";
+type ExistingStoredPost = {
+  id: string;
+  url: string;
+  content_hash: string | null;
+  crawl_status: string | null;
+  discovery_source: string | null;
+  exclusion_reason: string | null;
+};
 
 export class NaverOptInRequiredError extends Error {
   code = "naver_opt_in_required" as const;
@@ -78,31 +91,150 @@ const deletePostsWithArtifacts = (postIds: string[]) => {
   sqlite.prepare(`DELETE FROM posts WHERE id IN (${placeholders})`).run(...postIds);
 };
 
-const removeStoredNonPostUrls = (
-  blog: Blog,
-  existing: Array<{
-    id: string;
-    url: string;
-    content_hash: string | null;
-  }>,
+const updateStoredPostState = (
+  rowId: string,
+  values: {
+    crawlStatus: CrawlStatus;
+    discoverySource?: string | null;
+    exclusionReason?: string | null;
+    lastVerifiedAt?: string | null;
+    excludedAt?: string | null;
+    lastCrawledAt?: string | null;
+    updatedAt: string;
+  },
 ) => {
-  if (blog.platform !== "tistory") return existing;
+  sqlite
+    .prepare(
+      `
+      UPDATE posts
+      SET
+        crawl_status = @crawlStatus,
+        discovery_source = @discoverySource,
+        exclusion_reason = @exclusionReason,
+        last_verified_at = @lastVerifiedAt,
+        excluded_at = @excludedAt,
+        last_crawled_at = COALESCE(@lastCrawledAt, last_crawled_at),
+        updated_at = @updatedAt
+      WHERE id = @id
+      `,
+    )
+    .run({
+      id: rowId,
+      crawlStatus: values.crawlStatus,
+      discoverySource: values.discoverySource ?? null,
+      exclusionReason: values.exclusionReason ?? null,
+      lastVerifiedAt: values.lastVerifiedAt ?? null,
+      excludedAt: values.excludedAt ?? null,
+      lastCrawledAt: values.lastCrawledAt ?? null,
+      updatedAt: values.updatedAt,
+    });
+};
+
+const excludeStoredPost = (
+  existingByUrl: Map<string, ExistingStoredPost>,
+  input: {
+    blogId: string;
+    url: string;
+    source: DiscoverySourceName | null;
+    reason: string;
+    now: string;
+  },
+) => {
+  const current = existingByUrl.get(input.url);
+  if (!current) {
+    const id = createId("post");
+    sqlite
+      .prepare(
+        `
+        INSERT INTO posts (
+          id, blog_id, url, title, published_at, category_name, tags_json, content_raw, content_clean, content_hash,
+          crawl_status, discovery_source, exclusion_reason, last_verified_at, excluded_at,
+          discovered_at, last_crawled_at, created_at, updated_at
+        ) VALUES (
+          @id, @blogId, @url, NULL, NULL, NULL, @tagsJson, NULL, NULL, NULL,
+          @crawlStatus, @discoverySource, @exclusionReason, NULL, @excludedAt,
+          @discoveredAt, @lastCrawledAt, @createdAt, @updatedAt
+        )
+        `,
+      )
+      .run({
+        id,
+        blogId: input.blogId,
+        url: input.url,
+        tagsJson: JSON.stringify([]),
+        crawlStatus: EXCLUDED_CRAWL_STATUS,
+        discoverySource: input.source,
+        exclusionReason: input.reason,
+        excludedAt: input.now,
+        discoveredAt: input.now,
+        lastCrawledAt: input.now,
+        createdAt: input.now,
+        updatedAt: input.now,
+      });
+    existingByUrl.set(input.url, {
+      id,
+      url: input.url,
+      content_hash: null,
+      crawl_status: EXCLUDED_CRAWL_STATUS,
+      discovery_source: input.source,
+      exclusion_reason: input.reason,
+    });
+    return;
+  }
+
+  updateStoredPostState(current.id, {
+    crawlStatus: EXCLUDED_CRAWL_STATUS,
+    discoverySource: input.source ?? current.discovery_source,
+    exclusionReason: input.reason,
+    lastVerifiedAt: null,
+    excludedAt: input.now,
+    lastCrawledAt: input.now,
+    updatedAt: input.now,
+  });
+  existingByUrl.set(input.url, {
+    ...current,
+    crawl_status: EXCLUDED_CRAWL_STATUS,
+    discovery_source: input.source ?? current.discovery_source,
+    exclusion_reason: input.reason,
+  });
+};
+
+const normalizeStoredTistoryRows = (blog: Blog, existingByUrl: Map<string, ExistingStoredPost>, now: string) => {
+  if (blog.platform !== "tistory") return;
 
   const adapter = getAdapter(blog.platform);
   const blogHost = normalizeHost(new URL(blog.mainUrl).hostname);
-  const stalePostIds = existing
-    .filter((item) => {
-      try {
-        const url = new URL(item.url);
-        return normalizeHost(url.hostname) === blogHost && !adapter.isPostUrl(url);
-      } catch {
-        return false;
-      }
-    })
-    .map((item) => item.id);
+  for (const current of existingByUrl.values()) {
+    try {
+      const url = new URL(current.url);
+      if (normalizeHost(url.hostname) !== blogHost) continue;
+      if (adapter.isPostUrl(url)) continue;
 
-  deletePostsWithArtifacts(stalePostIds);
-  return stalePostIds.length ? existing.filter((item) => !stalePostIds.includes(item.id)) : existing;
+      updateStoredPostState(current.id, {
+        crawlStatus: EXCLUDED_CRAWL_STATUS,
+        discoverySource: current.discovery_source,
+        exclusionReason: "blocked_path",
+        lastVerifiedAt: null,
+        excludedAt: now,
+        updatedAt: now,
+      });
+      existingByUrl.set(current.url, {
+        ...current,
+        crawl_status: EXCLUDED_CRAWL_STATUS,
+        exclusion_reason: "blocked_path",
+      });
+    } catch {
+      continue;
+    }
+  }
+};
+
+const fetchFailureReason = (error: unknown) => {
+  const message = error instanceof Error ? error.message : "";
+  if (/not .*post page/i.test(message) || /not .*article/i.test(message)) {
+    return "not_article";
+  }
+  return "fetch_failed";
 };
 
 const aggregatedScoreRowsForBlog = (blogId: string, limit: number) =>
@@ -123,7 +255,7 @@ const aggregatedScoreRowsForBlog = (blogId: string, limit: number) =>
       FROM analysis_run_targets art
       JOIN analysis_runs ar ON ar.id = art.run_id
       JOIN post_analyses pa ON pa.run_id = ar.id
-      JOIN posts p ON p.id = pa.post_id AND p.blog_id = art.blog_id
+      JOIN posts p ON p.id = pa.post_id AND p.blog_id = art.blog_id AND COALESCE(p.crawl_status, 'verified') = 'verified'
       WHERE art.blog_id = ? AND ar.status = 'completed'
       GROUP BY ar.id, ar.started_at
       HAVING COUNT(p.id) > 0
@@ -198,7 +330,7 @@ export const listBlogs = async (): Promise<BlogWithStats[]> => {
         ) as latest_run_at,
         MAX(p.last_crawled_at) as last_crawl_at
       FROM blogs b
-      LEFT JOIN posts p ON p.blog_id = b.id
+      LEFT JOIN posts p ON p.blog_id = b.id AND COALESCE(p.crawl_status, 'verified') = 'verified'
       GROUP BY b.id
       ORDER BY b.created_at DESC
       `,
@@ -227,7 +359,9 @@ export const listBlogs = async (): Promise<BlogWithStats[]> => {
               pa.seo_potential_score,
               pa.audience_fit_score
             FROM post_analyses pa
+            JOIN posts p ON p.id = pa.post_id
             WHERE pa.run_id = ?
+              AND COALESCE(p.crawl_status, 'verified') = 'verified'
             ORDER BY pa.created_at DESC
             `,
           )
@@ -391,79 +525,171 @@ export const discoverBlogPosts = async (blogId: string) => {
   const discovered = discovery.posts;
   const adapter = getAdapter(blog.platform);
   const now = nowIso();
-  const existing = sqlite.prepare("SELECT id, url, content_hash FROM posts WHERE blog_id = ?").all(blogId) as Array<{
-    id: string;
-    url: string;
-    content_hash: string | null;
-  }>;
-  const sanitizedExisting = removeStoredNonPostUrls(blog, existing);
-  const existingByUrl = new Map(sanitizedExisting.map((item) => [item.url, item]));
+  const existing = sqlite
+    .prepare(
+      `
+      SELECT id, url, content_hash, crawl_status, discovery_source, exclusion_reason
+      FROM posts
+      WHERE blog_id = ?
+      `,
+    )
+    .all(blogId) as ExistingStoredPost[];
+  const existingByUrl = new Map(existing.map((item) => [item.url, item]));
+  normalizeStoredTistoryRows(blog, existingByUrl, now);
   let inserted = 0;
   let updated = 0;
+  let verifiedCount = 0;
+  let verifiedFromPrimarySources = 0;
   const insertedPostIds: string[] = [];
   const updatedPostIds: string[] = [];
+  const acceptedSourceCounts = {
+    rss: 0,
+    sitemap: 0,
+    main: 0,
+    wpJson: 0,
+  };
 
   for (const item of discovered) {
+    if (blog.platform === "tistory" && item.source === "main" && verifiedFromPrimarySources > 0) {
+      continue;
+    }
+
+    try {
+      const candidateUrl = new URL(item.url);
+      if (!adapter.isPostUrl(candidateUrl)) {
+        excludeStoredPost(existingByUrl, {
+          blogId,
+          url: item.url,
+          source: item.source,
+          reason: "blocked_path",
+          now,
+        });
+        console.info(`[discover:${blog.platform}] excluded ${item.url} (blocked_path)`);
+        continue;
+      }
+    } catch {
+      excludeStoredPost(existingByUrl, {
+        blogId,
+        url: item.url,
+        source: item.source,
+        reason: "invalid_url",
+        now,
+      });
+      console.info(`[discover:${blog.platform}] excluded ${item.url} (invalid_url)`);
+      continue;
+    }
+
     try {
       const fetched = await adapter.fetchPost(item.url);
       const hash = sha256(fetched.contentClean);
       const current = existingByUrl.get(fetched.url);
+      const nextState = {
+        title: fetched.title,
+        publishedAt: fetched.publishedAt ?? null,
+        categoryName: fetched.categoryName ?? null,
+        tagsJson: JSON.stringify(fetched.tags),
+        contentRaw: fetched.contentRaw,
+        contentClean: fetched.contentClean,
+        contentHash: hash,
+        crawlStatus: VERIFIED_CRAWL_STATUS,
+        discoverySource: item.source,
+        exclusionReason: null,
+        lastVerifiedAt: now,
+        excludedAt: null,
+        lastCrawledAt: now,
+        updatedAt: now,
+      } as const;
+
+      let storedPostId: string;
       if (!current) {
         const postId = createId("post");
         await db.insert(posts).values({
           id: postId,
           blogId,
           url: fetched.url,
-          title: fetched.title,
-          publishedAt: fetched.publishedAt ?? null,
-          categoryName: fetched.categoryName ?? null,
-          tagsJson: JSON.stringify(fetched.tags),
-          contentRaw: fetched.contentRaw,
-          contentClean: fetched.contentClean,
-          contentHash: hash,
+          title: nextState.title,
+          publishedAt: nextState.publishedAt,
+          categoryName: nextState.categoryName,
+          tagsJson: nextState.tagsJson,
+          contentRaw: nextState.contentRaw,
+          contentClean: nextState.contentClean,
+          contentHash: nextState.contentHash,
+          crawlStatus: nextState.crawlStatus,
+          discoverySource: nextState.discoverySource,
+          exclusionReason: nextState.exclusionReason,
+          lastVerifiedAt: nextState.lastVerifiedAt,
+          excludedAt: nextState.excludedAt,
           discoveredAt: now,
-          lastCrawledAt: now,
+          lastCrawledAt: nextState.lastCrawledAt,
           createdAt: now,
-          updatedAt: now,
+          updatedAt: nextState.updatedAt,
         });
         inserted += 1;
         insertedPostIds.push(postId);
-      } else if (current.content_hash !== hash) {
+        storedPostId = postId;
+        existingByUrl.set(fetched.url, {
+          id: postId,
+          url: fetched.url,
+          content_hash: hash,
+          crawl_status: VERIFIED_CRAWL_STATUS,
+          discovery_source: item.source,
+          exclusion_reason: null,
+        });
+      } else if (current.content_hash !== hash || current.crawl_status !== VERIFIED_CRAWL_STATUS) {
         await db
           .update(posts)
-          .set({
-            title: fetched.title,
-            publishedAt: fetched.publishedAt ?? null,
-            categoryName: fetched.categoryName ?? null,
-            tagsJson: JSON.stringify(fetched.tags),
-            contentRaw: fetched.contentRaw,
-            contentClean: fetched.contentClean,
-            contentHash: hash,
-            lastCrawledAt: now,
-            updatedAt: now,
-          })
+          .set(nextState)
           .where(eq(posts.id, current.id));
         updated += 1;
         updatedPostIds.push(current.id);
+        storedPostId = current.id;
+        existingByUrl.set(fetched.url, {
+          ...current,
+          content_hash: hash,
+          crawl_status: VERIFIED_CRAWL_STATUS,
+          discovery_source: item.source,
+          exclusion_reason: null,
+        });
       } else {
         await db
           .update(posts)
           .set({
+            crawlStatus: VERIFIED_CRAWL_STATUS,
+            discoverySource: item.source,
+            exclusionReason: null,
+            lastVerifiedAt: now,
+            excludedAt: null,
             lastCrawledAt: now,
             updatedAt: now,
           })
           .where(eq(posts.id, current.id));
+        storedPostId = current.id;
+        existingByUrl.set(fetched.url, {
+          ...current,
+          crawl_status: VERIFIED_CRAWL_STATUS,
+          discovery_source: item.source,
+          exclusion_reason: null,
+        });
       }
 
-      const storedPost = sqlite.prepare("SELECT id FROM posts WHERE url = ?").get(fetched.url) as { id: string } | undefined;
-      if (storedPost && appSettings.collectEngagementSnapshots) {
+      verifiedCount += 1;
+      if (item.source !== "main") {
+        verifiedFromPrimarySources += 1;
+      }
+      if (item.source === "wp-json") {
+        acceptedSourceCounts.wpJson += 1;
+      } else {
+        acceptedSourceCounts[item.source] += 1;
+      }
+
+      if (appSettings.collectEngagementSnapshots) {
         const engagement = await adapter.extractEngagement(
           fetched.url,
           fetched.pageHtml || fetched.contentRaw || fetched.contentClean,
         );
         await db.insert(postEngagementSnapshots).values({
           id: createId("eng"),
-          postId: storedPost.id,
+          postId: storedPostId,
           commentsCount: engagement.commentsCount ?? null,
           likesCount: engagement.likesCount ?? null,
           sympathyCount: engagement.sympathyCount ?? null,
@@ -472,19 +698,28 @@ export const discoverBlogPosts = async (blogId: string) => {
           rawJson: JSON.stringify(engagement.rawJson ?? {}),
         });
       }
-    } catch {
+    } catch (error) {
+      const reason = fetchFailureReason(error);
+      excludeStoredPost(existingByUrl, {
+        blogId,
+        url: item.url,
+        source: item.source,
+        reason,
+        now,
+      });
+      console.info(`[discover:${blog.platform}] excluded ${item.url} (${reason})`);
       continue;
     }
   }
 
   return {
     blog,
-    discoveredCount: discovered.length,
+    discoveredCount: verifiedCount,
     insertedCount: inserted,
     updatedCount: updated,
     insertedPostIds,
     updatedPostIds,
-    sourceCounts: discovery.sourceCounts,
+    sourceCounts: acceptedSourceCounts,
   };
 };
 
@@ -512,6 +747,7 @@ export const getBlogDetail = async (id: string) => {
         (SELECT pa.audience_fit_score FROM post_analyses pa JOIN analysis_runs ar ON ar.id = pa.run_id WHERE pa.post_id = p.id AND ar.status = 'completed' ORDER BY pa.created_at DESC LIMIT 1) as audience_fit_score
       FROM posts p
       WHERE p.blog_id = ?
+        AND COALESCE(p.crawl_status, 'verified') = 'verified'
       ORDER BY COALESCE(p.published_at, p.created_at) DESC
       LIMIT 50
       `,
@@ -561,6 +797,14 @@ export const getBlogDetail = async (id: string) => {
       JOIN analysis_runs ar ON ar.id = wr.run_id
       JOIN analysis_run_targets art ON art.run_id = ar.id
       WHERE art.blog_id = ?
+        AND EXISTS (
+          SELECT 1
+          FROM post_analyses pa
+          JOIN posts p ON p.id = pa.post_id
+          WHERE pa.run_id = ar.id
+            AND p.blog_id = art.blog_id
+            AND COALESCE(p.crawl_status, 'verified') = 'verified'
+        )
       ORDER BY r.created_at DESC
       LIMIT 6
       `,

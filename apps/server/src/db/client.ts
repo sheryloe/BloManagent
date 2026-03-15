@@ -38,6 +38,11 @@ const createStatements = [
     content_raw TEXT,
     content_clean TEXT,
     content_hash TEXT,
+    crawl_status TEXT NOT NULL DEFAULT 'verified',
+    discovery_source TEXT,
+    exclusion_reason TEXT,
+    last_verified_at TEXT,
+    excluded_at TEXT,
     discovered_at TEXT NOT NULL,
     last_crawled_at TEXT,
     created_at TEXT NOT NULL,
@@ -247,6 +252,19 @@ sqlite.pragma("foreign_keys = ON");
 for (const statement of createStatements) {
   sqlite.exec(statement);
 }
+
+const ensureColumn = (tableName: string, columnName: string, definition: string) => {
+  const columns = sqlite.prepare(`PRAGMA table_info(${tableName})`).all() as Array<{ name: string }>;
+  if (columns.some((column) => column.name === columnName)) return;
+  sqlite.exec(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${definition}`);
+};
+
+ensureColumn("posts", "crawl_status", "TEXT NOT NULL DEFAULT 'verified'");
+ensureColumn("posts", "discovery_source", "TEXT");
+ensureColumn("posts", "exclusion_reason", "TEXT");
+ensureColumn("posts", "last_verified_at", "TEXT");
+ensureColumn("posts", "excluded_at", "TEXT");
+sqlite.prepare("UPDATE posts SET crawl_status = 'verified' WHERE crawl_status IS NULL").run();
 
 export const db = drizzle(sqlite, { schema });
 
