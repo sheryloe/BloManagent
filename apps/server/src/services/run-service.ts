@@ -419,6 +419,10 @@ class AnalysisCoordinator {
       rows = rows.filter((row) => (row.publishedAt ?? row.createdAt) >= floor);
     }
 
+    if (providerSettings.provider === "algorithm") {
+      return rows;
+    }
+
     return rows.slice(0, providerSettings.maxPostsPerRun);
   }
 }

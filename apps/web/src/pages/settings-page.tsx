@@ -93,7 +93,7 @@ export function SettingsPage() {
             <strong>기본 엔진</strong>
             <p className="muted">
               {algorithmConfig
-                ? `algorithm / ${algorithmConfig.model} / 글당 최대 ${algorithmConfig.maxPostsPerRun}개`
+                ? `algorithm / ${algorithmConfig.model} / 선택 범위 전체 분석`
                 : "algorithm 엔진 설정이 없습니다."}
             </p>
           </div>
@@ -126,7 +126,7 @@ export function SettingsPage() {
           </label>
 
           <p className="muted">
-            점수는 algorithm이 계산하고, 아래 AI 엔진은 요약 문장 보강 용도로만 사용됩니다.
+            점수는 algorithm이 계산하고, algorithm은 선택 범위 전체 글을 기본으로 분석합니다. 아래 AI 엔진은 요약 문장 보강 용도로만 사용됩니다.
           </p>
 
           <label>

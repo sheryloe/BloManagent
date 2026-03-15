@@ -1,5 +1,8 @@
 # 테스트, 빌드, Windows 실행, 향후 확장 전략
 
+> Current note
+> This document includes historical references to the older EBI-based scoring flow. The current app and public docs use `qualityScore`.
+
 > 메타 설명  
 > BloManagent를 실제로 실행 가능한 로컬 앱 형태로 만들기 위해 테스트, 빌드 스크립트, Windows 실행 방식, 문서화, 향후 Electron/Tauri 확장 전략을 어떻게 잡았는지 정리합니다.
 

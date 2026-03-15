@@ -1,5 +1,8 @@
 # AI 분석 파이프라인과 대시보드 구현 과정
 
+> Current note
+> This document describes an older EBI-based iteration. The current app and public docs use `qualityScore` as the primary post-level score.
+
 > 메타 설명  
 > BloManagent에서 Google AI Studio, OpenAI, Ollama를 선택형으로 연결하고, 포스트 분석부터 주간 요약, EBI 계산, 추천, 대시보드 UI까지 어떻게 구현했는지 설명합니다.
 

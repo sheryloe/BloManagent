@@ -70,6 +70,69 @@ const calculateQualityFromPostRow = (row: Record<string, unknown> | null) => {
   });
 };
 
+const deletePostsWithArtifacts = (postIds: string[]) => {
+  if (!postIds.length) return;
+  const placeholders = postIds.map(() => "?").join(", ");
+  sqlite.prepare(`DELETE FROM post_engagement_snapshots WHERE post_id IN (${placeholders})`).run(...postIds);
+  sqlite.prepare(`DELETE FROM post_analyses WHERE post_id IN (${placeholders})`).run(...postIds);
+  sqlite.prepare(`DELETE FROM posts WHERE id IN (${placeholders})`).run(...postIds);
+};
+
+const removeStoredNonPostUrls = (
+  blog: Blog,
+  existing: Array<{
+    id: string;
+    url: string;
+    content_hash: string | null;
+  }>,
+) => {
+  if (blog.platform !== "tistory") return existing;
+
+  const adapter = getAdapter(blog.platform);
+  const blogHost = normalizeHost(new URL(blog.mainUrl).hostname);
+  const stalePostIds = existing
+    .filter((item) => {
+      try {
+        const url = new URL(item.url);
+        return normalizeHost(url.hostname) === blogHost && !adapter.isPostUrl(url);
+      } catch {
+        return false;
+      }
+    })
+    .map((item) => item.id);
+
+  deletePostsWithArtifacts(stalePostIds);
+  return stalePostIds.length ? existing.filter((item) => !stalePostIds.includes(item.id)) : existing;
+};
+
+const aggregatedScoreRowsForBlog = (blogId: string, limit: number) =>
+  sqlite
+    .prepare(
+      `
+      SELECT
+        ar.id as run_id,
+        ar.started_at,
+        AVG(pa.title_strength) as avg_title_strength,
+        AVG(pa.hook_strength) as avg_hook_strength,
+        AVG(pa.structure_score) as avg_structure_score,
+        AVG(pa.information_density_score) as avg_information_density_score,
+        AVG(pa.practicality_score) as avg_practicality_score,
+        AVG(pa.differentiation_score) as avg_differentiation_score,
+        AVG(pa.seo_potential_score) as avg_seo_potential_score,
+        AVG(pa.audience_fit_score) as avg_audience_fit_score
+      FROM analysis_run_targets art
+      JOIN analysis_runs ar ON ar.id = art.run_id
+      JOIN post_analyses pa ON pa.run_id = ar.id
+      JOIN posts p ON p.id = pa.post_id AND p.blog_id = art.blog_id
+      WHERE art.blog_id = ? AND ar.status = 'completed'
+      GROUP BY ar.id, ar.started_at
+      HAVING COUNT(p.id) > 0
+      ORDER BY ar.started_at DESC
+      LIMIT ?
+      `,
+    )
+    .all(blogId, limit) as Array<Record<string, unknown>>;
+
 export const assertBlogCrawlAllowed = async (blog: Blog, settings?: AppSettings) => {
   const appSettings = settings ?? (await getAppSettings());
   if (blog.platform === "naver" && !appSettings.allowNaverPublicCrawl) {
@@ -144,28 +207,7 @@ export const listBlogs = async (): Promise<BlogWithStats[]> => {
 
   return rows.map((row) => {
     const blogId = String(row.id);
-    const latestScores = sqlite
-      .prepare(
-        `
-        SELECT
-          bws.avg_title_strength,
-          bws.avg_hook_strength,
-          bws.avg_structure_score,
-          bws.avg_information_density_score,
-          bws.avg_practicality_score,
-          bws.avg_differentiation_score,
-          bws.avg_seo_potential_score,
-          bws.avg_audience_fit_score
-        FROM analysis_run_targets art
-        JOIN analysis_runs ar ON ar.id = art.run_id
-        JOIN weekly_reports wr ON wr.run_id = ar.id
-        JOIN blog_weekly_scores bws ON bws.weekly_report_id = wr.id AND bws.blog_id = art.blog_id
-        WHERE art.blog_id = ? AND ar.status = 'completed'
-        ORDER BY ar.started_at DESC
-        LIMIT 2
-        `,
-      )
-      .all(blogId) as Array<Record<string, unknown>>;
+    const latestScores = aggregatedScoreRowsForBlog(blogId, 2);
 
     const latestQualityScore = latestScores[0] ? calculateQualityFromAverages(latestScores[0]).qualityScore : null;
     const previousQualityScore = latestScores[1] ? calculateQualityFromAverages(latestScores[1]).qualityScore : null;
@@ -285,10 +327,7 @@ export const deleteBlog = async (id: string) => {
 
   const transaction = sqlite.transaction(() => {
     if (postIds.length) {
-      const placeholders = postIds.map(() => "?").join(", ");
-      sqlite.prepare(`DELETE FROM post_engagement_snapshots WHERE post_id IN (${placeholders})`).run(...postIds);
-      sqlite.prepare(`DELETE FROM post_analyses WHERE post_id IN (${placeholders})`).run(...postIds);
-      sqlite.prepare(`DELETE FROM posts WHERE id IN (${placeholders})`).run(...postIds);
+      deletePostsWithArtifacts(postIds);
     }
 
     if (reportIds.length) {
@@ -357,7 +396,8 @@ export const discoverBlogPosts = async (blogId: string) => {
     url: string;
     content_hash: string | null;
   }>;
-  const existingByUrl = new Map(existing.map((item) => [item.url, item]));
+  const sanitizedExisting = removeStoredNonPostUrls(blog, existing);
+  const existingByUrl = new Map(sanitizedExisting.map((item) => [item.url, item]));
   let inserted = 0;
   let updated = 0;
   const insertedPostIds: string[] = [];
@@ -510,29 +550,7 @@ export const getBlogDetail = async (id: string) => {
       return left.qualityScore - right.qualityScore;
     });
 
-  const scoreRows = sqlite
-    .prepare(
-      `
-      SELECT
-        ar.started_at,
-        bws.avg_title_strength,
-        bws.avg_hook_strength,
-        bws.avg_structure_score,
-        bws.avg_information_density_score,
-        bws.avg_practicality_score,
-        bws.avg_differentiation_score,
-        bws.avg_seo_potential_score,
-        bws.avg_audience_fit_score
-      FROM analysis_run_targets art
-      JOIN analysis_runs ar ON ar.id = art.run_id
-      JOIN weekly_reports wr ON wr.run_id = ar.id
-      JOIN blog_weekly_scores bws ON bws.weekly_report_id = wr.id AND bws.blog_id = art.blog_id
-      WHERE art.blog_id = ? AND ar.status = 'completed'
-      ORDER BY ar.started_at DESC
-      LIMIT 12
-      `,
-    )
-    .all(id) as Array<Record<string, unknown>>;
+  const scoreRows = aggregatedScoreRowsForBlog(id, 12);
 
   const recommendationRows = sqlite
     .prepare(
