@@ -241,6 +241,7 @@ export const runDefaultDiscovery = async (
   settings?: DiscoverySettings,
   options?: {
     loadMainPage?: (url: string) => Promise<Pick<FetchResult, "html" | "url">>;
+    parseSitemap?: (xml: string) => string[];
   },
 ): Promise<DiscoveryResult> => {
   const mainPageUrl = new URL(mainUrl);
@@ -278,7 +279,8 @@ export const runDefaultDiscovery = async (
             },
           });
           if (response.status < 400) {
-            addDiscoveredLinks(found, sourceCounts, parseFeedLinks(response.html), "sitemap", mainPageUrl, adapter);
+            const sitemapLinks = options?.parseSitemap ? options.parseSitemap(response.html) : parseFeedLinks(response.html);
+            addDiscoveredLinks(found, sourceCounts, sitemapLinks, "sitemap", mainPageUrl, adapter);
           }
         } catch {
           continue;

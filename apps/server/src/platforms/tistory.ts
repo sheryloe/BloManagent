@@ -1,7 +1,17 @@
 import * as cheerio from "cheerio";
 import { normalizeUrl } from "../lib/utils";
-import { buildPost, collectLinks, detectDate, fetchWithTimeout, numberFromText, selectHtml, selectText } from "./common";
-import type { BlogPlatformAdapter } from "./types";
+import {
+  buildPost,
+  collectLinks,
+  detectDate,
+  fetchWithTimeout,
+  numberFromText,
+  runDefaultDiscovery,
+  selectHtml,
+  selectText,
+  xmlParser,
+} from "./common";
+import type { BlogPlatformAdapter, DiscoveryResult } from "./types";
 
 const blockedTistoryPrefixes = [
   "/archive",
@@ -19,6 +29,31 @@ const blockedTistoryPrefixes = [
 const looksLikeTistoryPost = ($: cheerio.CheerioAPI) =>
   selectText($, ["meta[property='og:type']"]) === "article" ||
   Boolean(selectText($, ["meta[property='article:published_time']"]));
+
+const parseTistorySitemapLinks = (xml: string) => {
+  try {
+    const parsed = xmlParser.parse(xml) as {
+      urlset?: {
+        url?:
+          | {
+              loc?: string;
+              lastmod?: string;
+            }
+          | Array<{
+              loc?: string;
+              lastmod?: string;
+            }>;
+      };
+    };
+
+    const entries = parsed.urlset?.url ? (Array.isArray(parsed.urlset.url) ? parsed.urlset.url : [parsed.urlset.url]) : [];
+    return entries
+      .filter((entry) => typeof entry.loc === "string" && entry.loc.startsWith("http") && Boolean(entry.lastmod))
+      .map((entry) => entry.loc as string);
+  } catch {
+    return [];
+  }
+};
 
 export const tistoryAdapter: BlogPlatformAdapter = {
   platform: "tistory",
@@ -44,6 +79,11 @@ export const tistoryAdapter: BlogPlatformAdapter = {
     return collectLinks(html, url.toString()).filter((link) => {
       const nextUrl = new URL(link);
       return nextUrl.hostname === url.hostname && this.isPostUrl(nextUrl);
+    });
+  },
+  discoverPosts(mainUrl, overrides, settings): Promise<DiscoveryResult> {
+    return runDefaultDiscovery(this, mainUrl, overrides, settings, {
+      parseSitemap: parseTistorySitemapLinks,
     });
   },
   async fetchPost(url) {
