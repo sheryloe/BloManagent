@@ -23,16 +23,24 @@ export const registerBlogRoutes = async (app: FastifyInstance) => {
   });
 
   app.post("/api/blogs", async (request, reply) => {
-    const blog = await createBlog(blogCreateSchema.parse(request.body));
-    return reply.status(201).send(blog);
+    try {
+      const blog = await createBlog(blogCreateSchema.parse(request.body));
+      return reply.status(201).send(blog);
+    } catch (error) {
+      return reply.status(400).send({ message: error instanceof Error ? error.message : "Blog create failed." });
+    }
   });
 
   app.patch("/api/blogs/:id", async (request, reply) => {
-    const result = await updateBlog((request.params as { id: string }).id, request.body as Record<string, unknown>);
-    if (!result) {
-      return reply.status(404).send({ message: "Blog not found." });
+    try {
+      const result = await updateBlog((request.params as { id: string }).id, request.body as Record<string, unknown>);
+      if (!result) {
+        return reply.status(404).send({ message: "Blog not found." });
+      }
+      return result;
+    } catch (error) {
+      return reply.status(400).send({ message: error instanceof Error ? error.message : "Blog update failed." });
     }
-    return result;
   });
 
   app.delete("/api/blogs/:id", async (request) => deleteBlog((request.params as { id: string }).id));

@@ -42,6 +42,45 @@ describe("tistoryAdapter.fetchPost", () => {
       "Not a Tistory post page.",
     );
   });
+
+  it("prefers og:title over blog h1 and strips style/script noise from content", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) =>
+        mockResponse(
+          String(input),
+          200,
+          `
+          <html>
+            <head>
+              <meta property="og:type" content="article">
+              <meta property="article:published_time" content="2026-03-15T12:00:00+09:00">
+              <meta property="og:title" content="실제 글 제목">
+              <title>실제 글 제목</title>
+            </head>
+            <body>
+              <h1>블로그 이름</h1>
+              <div class="tt_article_useless_p_margin">
+                <style>.post-wrap{color:red}</style>
+                <script>console.log("ad code")</script>
+                <p>첫 문단입니다.</p>
+                <p>두 번째 문단입니다.</p>
+              </div>
+            </body>
+          </html>
+          `,
+        ),
+      ),
+    );
+
+    const result = await tistoryAdapter.fetchPost("https://sample.tistory.com/123");
+    expect(result.title).toBe("실제 글 제목");
+    expect(result.contentClean).toContain("첫 문단입니다.");
+    expect(result.contentClean).toContain("두 번째 문단입니다.");
+    expect(result.contentClean).not.toContain("블로그 이름");
+    expect(result.contentClean).not.toContain("post-wrap");
+    expect(result.contentClean).not.toContain("ad code");
+  });
 });
 
 describe("tistoryAdapter.discoverPosts", () => {

@@ -2,21 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import type { DashboardResponse } from "@blog-review/shared";
 import { api } from "../api";
+import { formatGrade, formatGradeRange, qualityTone } from "../lib/quality";
 
 const formatDate = (value?: string | null) => (value ? new Date(value).toLocaleString("ko-KR") : "-");
-
-const formatDelta = (value: number | null) => {
-  if (value == null) return "변화 없음";
-  return `${value >= 0 ? "+" : ""}${value.toFixed(1)}`;
-};
-
-const qualityTone = (score: number | null) => {
-  if (score == null) return { label: "미분석", tone: "neutral" as const };
-  if (score >= 80) return { label: "우수", tone: "good" as const };
-  if (score >= 65) return { label: "안정", tone: "watch" as const };
-  if (score >= 50) return { label: "주의", tone: "watch" as const };
-  return { label: "보완 필요", tone: "risk" as const };
-};
 
 export function DashboardPage() {
   const [data, setData] = useState<DashboardResponse | null>(null);
@@ -33,28 +21,18 @@ export function DashboardPage() {
     if (!data) return null;
 
     const totalPosts = data.blogs.reduce((sum, blog) => sum + blog.postCount, 0);
-    const averageQuality =
-      data.blogs.filter((blog) => blog.latestQualityScore != null).reduce((sum, blog, _, list) => {
-        return sum + (blog.latestQualityScore ?? 0) / Math.max(list.length, 1);
-      }, 0) || null;
+    const qualityValues = data.blogs
+      .map((blog) => blog.latestQualityScore)
+      .filter((value): value is number => typeof value === "number");
     const watchPosts = data.blogs.reduce((sum, blog) => sum + blog.watchPostCount, 0);
+    const repeatedTitleWarnings = data.blogs.reduce((sum, blog) => sum + blog.repeatedTitleWarningCount, 0);
     const recommendationByBlog = new Map(
       data.latestRecommendations.filter((item) => item.blogId).map((item) => [item.blogId as string, item]),
-    );
-    const engineSummary = Array.from(
-      data.latestRuns.reduce((map, run) => {
-        map.set(run.engine, (map.get(run.engine) ?? 0) + 1);
-        return map;
-      }, new Map<string, number>()),
     );
 
     const blogCards = [...data.blogs]
       .map((blog) => ({
         ...blog,
-        delta:
-          blog.latestQualityScore != null && blog.previousQualityScore != null
-            ? blog.latestQualityScore - blog.previousQualityScore
-            : null,
         nextAction: recommendationByBlog.get(blog.id) ?? null,
         health: qualityTone(blog.latestQualityScore),
       }))
@@ -62,25 +40,28 @@ export function DashboardPage() {
 
     return {
       totalPosts,
-      averageQuality,
+      averageQuality: qualityValues.length
+        ? qualityValues.reduce((sum, value) => sum + value, 0) / qualityValues.length
+        : null,
       watchPosts,
+      repeatedTitleWarnings,
       activeRuns: data.latestRuns.filter((run) => run.status === "queued" || run.status === "in_progress").length,
       blogCards,
-      engineSummary,
     };
   }, [data]);
 
   if (error) return <div className="panel error">{error}</div>;
-  if (!data || !derived) return <div className="panel">대시보드를 불러오는 중입니다.</div>;
+  if (!data || !derived) return <div className="panel">대시보드 데이터를 불러오는 중입니다.</div>;
 
   return (
     <div className="page">
       <section className="hero dashboard-hero">
         <div>
-          <p className="eyebrow">Dashboard</p>
-          <h2>게시글 단위로 먼저 손볼 곳을 바로 확인하세요</h2>
+          <p className="eyebrow">Executive Snapshot</p>
+          <h2>지금 가장 먼저 봐야 할 블로그와 게시글을 보여주는 분석 개요</h2>
           <p className="muted">
-            평균 점수보다 지금 낮은 글과 반복 이슈를 먼저 보여주도록 구성했습니다. 수집된 글 수, 최근 분석, 다음 액션을 한 번에 봅니다.
+            평균 수치보다 중요한 것은 현재 위험 구간의 글, 반복되는 약점, 그리고 바로 실행할 다음 액션입니다. 이 화면은 최신 분석
+            스냅샷만 기준으로 보는 운영 보드입니다.
           </p>
         </div>
 
@@ -90,12 +71,12 @@ export function DashboardPage() {
             <strong>{data.blogs.length}</strong>
           </div>
           <div className="metric-card">
-            <span>수집 글 수</span>
+            <span>검증된 글 수</span>
             <strong>{derived.totalPosts}</strong>
           </div>
           <div className="metric-card">
-            <span>평균 품질 점수</span>
-            <strong>{derived.averageQuality ? derived.averageQuality.toFixed(1) : "-"}</strong>
+            <span>평균 등급</span>
+            <strong>{formatGrade(derived.averageQuality)}</strong>
           </div>
           <div className="metric-card">
             <span>주의 글 수</span>
@@ -107,7 +88,7 @@ export function DashboardPage() {
       <section className="grid two">
         <div className="panel">
           <div className="section-header">
-            <h3>블로그 상태</h3>
+            <h3>블로그 상태 보드</h3>
           </div>
 
           <div className="card-list">
@@ -125,162 +106,117 @@ export function DashboardPage() {
 
                 <div className="pill-row">
                   <span className="pill">{blog.platform}</span>
-                  <span className="pill">최신 점수 {blog.latestQualityScore?.toFixed(1) ?? "-"}</span>
+                  <span className="pill">최신 등급 {blog.latestQualityGrade ?? formatGrade(blog.latestQualityScore)}</span>
                   <span className="pill">분석 글 {blog.analyzedPostCount}</span>
                   <span className="pill">주의 글 {blog.watchPostCount}</span>
-                  <span className={blog.delta != null && blog.delta >= 0 ? "pill delta up" : "pill delta down"}>
-                    {formatDelta(blog.delta)}
-                  </span>
                 </div>
 
                 <div className="insight-grid">
-                  <div>
-                    <small className="muted">마지막 수집</small>
-                    <p>{formatDate(blog.lastCrawlAt)}</p>
+                  <div className="summary-card">
+                    <small className="muted">등급 범위</small>
+                    <strong>{formatGradeRange(blog.scoreRangeMin, blog.scoreRangeMax)}</strong>
                   </div>
-                  <div>
-                    <small className="muted">마지막 분석</small>
-                    <p>{formatDate(blog.latestRunAt)}</p>
+                  <div className="summary-card">
+                    <small className="muted">점수 분산</small>
+                    <strong>{blog.distinctQualityScoreCount}</strong>
                   </div>
                 </div>
 
-                <div className="action-box">
-                  <small className="muted">반복 이슈</small>
-                  <p>{blog.topIssues.length ? blog.topIssues.join(", ") : "아직 반복 이슈가 집계되지 않았습니다."}</p>
+                <div className="insight-grid">
+                  <div className="action-box">
+                    <small className="muted">반복 이슈</small>
+                    <p>{blog.topIssues.length ? blog.topIssues.join(", ") : "아직 반복 이슈가 감지되지 않았습니다."}</p>
+                  </div>
+                  <div className="action-box">
+                    <small className="muted">반복 제목 경고</small>
+                    <p>{blog.repeatedTitleWarningCount ? `${blog.repeatedTitleWarningCount}건` : "없음"}</p>
+                  </div>
                 </div>
 
                 <div className="action-box">
                   <small className="muted">다음 액션</small>
-                  <strong>{blog.nextAction?.title ?? "먼저 수집과 분석을 실행해 주세요."}</strong>
-                  <p>{blog.nextAction?.description ?? "최근 분석이 쌓이면 블로그별 우선 액션을 자동으로 보여줍니다."}</p>
+                  <strong>{blog.nextAction?.title ?? "수집과 분석을 먼저 한 번 실행해 주세요."}</strong>
+                  <p>{blog.nextAction?.description ?? "최신 분석이 쌓이면 블로그별 추천 액션이 여기에 표시됩니다."}</p>
+                </div>
+
+                <div className="pill-row">
+                  <span className="pill">마지막 수집 {formatDate(blog.lastCrawlAt)}</span>
+                  <span className="pill">마지막 분석 {formatDate(blog.latestRunAt)}</span>
                 </div>
               </article>
             ))}
           </div>
         </div>
 
-        <div className="panel">
-          <div className="section-header">
-            <h3>먼저 손볼 게시글</h3>
-          </div>
-
-          <div className="stack-list">
-            {data.latestPostDiagnostics.length ? (
-              data.latestPostDiagnostics.map((item) => (
-                <article className="stack-item" key={item.postId}>
-                  <div className="pill-row">
-                    <span className="pill">{item.blogName}</span>
-                    <span className="pill">점수 {item.qualityScore}</span>
-                    <span className={`status-pill ${qualityTone(item.qualityScore).tone}`}>
-                      {qualityTone(item.qualityScore).label}
-                    </span>
-                  </div>
-                  <strong>
-                    <a href={item.url} rel="noreferrer" target="_blank">
-                      {item.title}
-                    </a>
-                  </strong>
-                  <p>{item.summary ?? "요약 없음"}</p>
-                  <div className="pill-row">
-                    {item.topImprovements.map((improvement) => (
-                      <span className="pill" key={improvement}>
-                        {improvement}
-                      </span>
-                    ))}
-                  </div>
-                </article>
-              ))
-            ) : (
-              <p className="muted">아직 게시글 분석 결과가 없습니다. 블로그를 등록하고 Analyze Now를 실행해 주세요.</p>
-            )}
-          </div>
-        </div>
-      </section>
-
-      <section className="grid two">
-        <div className="panel">
-          <div className="section-header">
-            <h3>최근 추천 액션</h3>
-          </div>
-          <div className="stack-list">
-            {data.latestRecommendations.length ? (
-              data.latestRecommendations.map((item) => (
-                <article className="stack-item" key={item.id}>
-                  <div className="pill-row">
-                    <span className="pill">{item.recommendationType}</span>
-                    <span className="pill">우선순위 {item.priority}</span>
-                  </div>
-                  <strong>{item.title}</strong>
-                  <p>{item.description}</p>
-                  <div className="pill-row">
-                    {item.actionItems.map((action) => (
-                      <span className="pill" key={action}>
-                        {action}
-                      </span>
-                    ))}
-                  </div>
-                </article>
-              ))
-            ) : (
-              <p className="muted">추천 액션은 분석 결과가 생기면 자동으로 채워집니다.</p>
-            )}
-          </div>
-        </div>
-
-        <div className="panel">
-          <div className="section-header">
-            <h3>운영 요약</h3>
-          </div>
-
-          <div className="dashboard-summary-grid">
-            <article className="summary-card">
-              <small className="muted">실행 중 분석</small>
-              <strong>{derived.activeRuns}</strong>
-            </article>
-            <article className="summary-card">
-              <small className="muted">완료된 분석</small>
-              <strong>{data.latestRuns.filter((run) => run.status === "completed").length}</strong>
-            </article>
-            <article className="summary-card">
-              <small className="muted">최근 추천 수</small>
-              <strong>{data.latestRecommendations.length}</strong>
-            </article>
-          </div>
-
-          <div className="pill-row summary-pills">
-            {derived.engineSummary.map(([engine, count]) => (
-              <span className="pill" key={engine}>
-                {engine} {count}
-              </span>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="panel">
-        <div className="section-header">
-          <h3>최근 실행 기록</h3>
-        </div>
-
-        <div className="table">
-          <div className="table-row table-head table-six">
-            <span>시작</span>
-            <span>엔진</span>
-            <span>모델</span>
-            <span>상태</span>
-            <span>글 수</span>
-            <span>비용</span>
-          </div>
-          {data.latestRuns.map((run) => (
-            <div className="table-row table-six" key={run.id}>
-              <span>{new Date(run.startedAt).toLocaleString("ko-KR")}</span>
-              <span>{run.engine}</span>
-              <span>{run.model}</span>
-              <span>{run.status}</span>
-              <span>{run.postCount}</span>
-              <span>${run.actualCost.toFixed(4)}</span>
+        <div className="stack-list">
+          <section className="panel">
+            <div className="section-header">
+              <h3>가장 먼저 볼 게시글</h3>
             </div>
-          ))}
+
+            <div className="stack-list">
+              {data.latestPostDiagnostics.length ? (
+                data.latestPostDiagnostics.map((item) => (
+                  <article className="stack-item" key={item.postId}>
+                    <div className="section-split">
+                      <div>
+                        <strong>
+                          <a href={item.url} rel="noreferrer" target="_blank">
+                            {item.title}
+                          </a>
+                        </strong>
+                        <p className="muted">{item.blogName}</p>
+                      </div>
+                      <span className={`status-pill ${qualityTone(item.qualityScore).tone}`}>
+                        {item.qualityGrade ?? formatGrade(item.qualityScore)}
+                      </span>
+                    </div>
+
+                    <p>{item.summary ?? "요약이 아직 없습니다."}</p>
+
+                    <div className="pill-row">
+                      {item.topImprovements.map((improvement) => (
+                        <span className="pill" key={improvement}>
+                          {improvement}
+                        </span>
+                      ))}
+                    </div>
+
+                    <div className="pill-row">
+                      {item.weakSignals.map((signal) => (
+                        <span className="pill risk-pill" key={signal}>
+                          {signal}
+                        </span>
+                      ))}
+                    </div>
+                  </article>
+                ))
+              ) : (
+                <p className="muted">아직 게시글 진단 결과가 없습니다. 수집 작업대에서 주소를 등록하고 분석을 실행해 주세요.</p>
+              )}
+            </div>
+          </section>
+
+          <section className="panel">
+            <div className="section-header">
+              <h3>운영 상태</h3>
+            </div>
+
+            <div className="dashboard-summary-grid">
+              <article className="summary-card">
+                <small className="muted">실행 중</small>
+                <strong>{derived.activeRuns}</strong>
+              </article>
+              <article className="summary-card">
+                <small className="muted">최신 추천 수</small>
+                <strong>{data.latestRecommendations.length}</strong>
+              </article>
+              <article className="summary-card">
+                <small className="muted">반복 제목 경고</small>
+                <strong>{derived.repeatedTitleWarnings}</strong>
+              </article>
+            </div>
+          </section>
         </div>
       </section>
     </div>

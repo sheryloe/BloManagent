@@ -6,6 +6,8 @@ import type {
   BlogDiscoveryResult,
   BlogWithStats,
   DashboardResponse,
+  Report,
+  RunDetails,
   SettingsPayload,
 } from "@blog-review/shared";
 
@@ -29,7 +31,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 export const api = {
   getDashboard: () => request<DashboardResponse>("/api/dashboard"),
   getBlogs: () => request<BlogWithStats[]>("/api/blogs"),
-  getBlog: (id: string) => request(`/api/blogs/${id}`),
+  getBlog: (id: string) => request<any>(`/api/blogs/${id}`),
   createBlog: (payload: BlogCreateInput) =>
     request<Blog>("/api/blogs", {
       method: "POST",
@@ -55,13 +57,18 @@ export const api = {
       body: JSON.stringify(payload),
     }),
   getRuns: () => request("/api/runs"),
-  getRun: (id: string) => request(`/api/runs/${id}`),
-  getReports: () => request("/api/reports"),
+  getRun: (id: string) => request<RunDetails>(`/api/runs/${id}`),
+  getReports: () => request<Report[]>("/api/reports"),
   getSettings: () => request("/api/settings"),
   saveSettings: (payload: SettingsPayload) =>
     request("/api/settings", {
       method: "PUT",
       body: JSON.stringify(payload),
+    }),
+  resetWorkspace: () =>
+    request<{ success: boolean }>("/api/workspace/reset", {
+      method: "POST",
+      body: JSON.stringify({}),
     }),
   getProviderModels: (engine: AnalysisEngine) => request(`/api/providers/${engine}/models`),
 };

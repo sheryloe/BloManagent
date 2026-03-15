@@ -108,6 +108,17 @@ const createStatements = [
     differentiation_score INTEGER,
     seo_potential_score INTEGER,
     audience_fit_score INTEGER,
+    headline_score INTEGER,
+    readability_score INTEGER,
+    value_score INTEGER,
+    originality_score INTEGER,
+    search_fit_score INTEGER,
+    quality_score INTEGER,
+    quality_status TEXT,
+    signal_breakdown_json TEXT,
+    content_metrics_json TEXT,
+    score_drivers_json TEXT,
+    score_risks_json TEXT,
     engagement_adjustment_note TEXT,
     created_at TEXT NOT NULL
   );`,
@@ -264,6 +275,17 @@ ensureColumn("posts", "discovery_source", "TEXT");
 ensureColumn("posts", "exclusion_reason", "TEXT");
 ensureColumn("posts", "last_verified_at", "TEXT");
 ensureColumn("posts", "excluded_at", "TEXT");
+ensureColumn("post_analyses", "headline_score", "INTEGER");
+ensureColumn("post_analyses", "readability_score", "INTEGER");
+ensureColumn("post_analyses", "value_score", "INTEGER");
+ensureColumn("post_analyses", "originality_score", "INTEGER");
+ensureColumn("post_analyses", "search_fit_score", "INTEGER");
+ensureColumn("post_analyses", "quality_score", "INTEGER");
+ensureColumn("post_analyses", "quality_status", "TEXT");
+ensureColumn("post_analyses", "signal_breakdown_json", "TEXT");
+ensureColumn("post_analyses", "content_metrics_json", "TEXT");
+ensureColumn("post_analyses", "score_drivers_json", "TEXT");
+ensureColumn("post_analyses", "score_risks_json", "TEXT");
 sqlite.prepare("UPDATE posts SET crawl_status = 'verified' WHERE crawl_status IS NULL").run();
 
 export const db = drizzle(sqlite, { schema });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculateQualityComponents, qualityStatus } from "./score";
+import { calculateQualityComponents, qualityGrade, qualityStatus } from "./score";
 
 describe("calculateQualityComponents", () => {
   it("returns explainable component scores and a bounded overall quality score", () => {
@@ -21,6 +21,7 @@ describe("calculateQualityComponents", () => {
     expect(result.searchFitScore).toBe(76);
     expect(result.qualityScore).toBe(74);
     expect(result.qualityStatus).toBe("solid");
+    expect(result.qualityGrade).toBe("B");
   });
 
   it("maps score ranges to statuses", () => {
@@ -28,5 +29,14 @@ describe("calculateQualityComponents", () => {
     expect(qualityStatus(65)).toBe("solid");
     expect(qualityStatus(50)).toBe("watch");
     expect(qualityStatus(49)).toBe("needs-work");
+  });
+
+  it("maps score ranges to grades", () => {
+    expect(qualityGrade(90)).toBe("S");
+    expect(qualityGrade(80)).toBe("A");
+    expect(qualityGrade(65)).toBe("B");
+    expect(qualityGrade(55)).toBe("C");
+    expect(qualityGrade(45)).toBe("D");
+    expect(qualityGrade(44)).toBe("F");
   });
 });

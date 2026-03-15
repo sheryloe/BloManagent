@@ -1,4 +1,9 @@
-import { heuristicAnalysisSummary, heuristicPostAnalysis, heuristicRecommendations } from "../services/heuristics";
+import {
+  buildNarrativeFromAnalysis,
+  heuristicAnalysisSummary,
+  heuristicPostAnalysis,
+  heuristicRecommendations,
+} from "../services/heuristics";
 import type {
   AIProvider,
   AnalyzePostInput,
@@ -23,7 +28,11 @@ class AlgorithmProvider implements AIProvider {
   }
 
   async analyzePost(input: AnalyzePostInput) {
-    return heuristicPostAnalysis(input);
+    const result = heuristicPostAnalysis(input);
+    return {
+      data: buildNarrativeFromAnalysis(result.data),
+      usage: result.usage,
+    };
   }
 
   async summarizeWeek(input: SummarizeWeekInput) {

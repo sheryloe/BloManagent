@@ -7,6 +7,7 @@ import { registerDashboardRoutes } from "./routes/dashboard";
 import { registerProviderRoutes } from "./routes/providers";
 import { registerRunRoutes } from "./routes/runs";
 import { registerSettingsRoutes } from "./routes/settings";
+import { registerWorkspaceRoutes } from "./routes/workspace";
 
 export const buildApp = async () => {
   const app = Fastify({
@@ -22,6 +23,7 @@ export const buildApp = async () => {
   await registerProviderRoutes(app);
   await registerRunRoutes(app);
   await registerSettingsRoutes(app);
+  await registerWorkspaceRoutes(app);
 
   if (process.env.NODE_ENV === "production") {
     await app.register(fastifyStatic, {

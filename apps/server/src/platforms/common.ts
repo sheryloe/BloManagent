@@ -121,8 +121,10 @@ export const selectHtml = ($: cheerio.CheerioAPI, selectors: string[]) => {
   for (const selector of selectors) {
     const node = $(selector).first();
     if (node.length) {
-      const html = node.html() ?? "";
-      const text = cleanText(node.text());
+      const cloned = node.clone();
+      cloned.find("script, style, noscript, template, iframe").remove();
+      const html = cloned.html() ?? "";
+      const text = cleanText(cloned.text());
       if (text) {
         return { html, text };
       }

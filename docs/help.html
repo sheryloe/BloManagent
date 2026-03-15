@@ -3,10 +3,10 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>BloManagent 도움말 | 설치, 수집 규칙, qualityScore, 티스토리 검증 로직</title>
+    <title>BloManagent 사용 안내 | 블로그 수집, 등급 체계, 티스토리 검증 규칙</title>
     <meta
       name="description"
-      content="BloManagent 설치 방법, 공개 블로그 수집 규칙, qualityScore 계산 방식, 티스토리 strict verified-post discovery와 정책 주의사항을 정리한 도움말 페이지입니다."
+      content="BloManagent 사용 방법, 게시글 등급 체계, 티스토리 strict verified-post 규칙, 플랫폼별 정책 주의사항을 정리한 도움말 페이지입니다."
     >
     <link rel="canonical" href="https://sheryloe.github.io/BloManagent/help.html">
     <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
@@ -25,206 +25,226 @@
           <span class="brand-mark">BM</span>
           <span class="brand-copy">
             <strong>BloManagent</strong>
-            <span>Manual & implementation notes</span>
+            <span>Manual and operating guide</span>
           </span>
         </a>
 
         <nav class="topnav" aria-label="페이지 탐색">
           <a href="#quick-start">빠른 시작</a>
-          <a href="#score">점수 구조</a>
-          <a href="#tistory">티스토리 규칙</a>
-          <a href="#series">Step 시리즈</a>
-          <a href="./index.html">소개</a>
+          <a href="#grade-system">등급 체계</a>
+          <a href="#tistory-rule">티스토리 규칙</a>
+          <a href="#policy">정책 범위</a>
+          <a href="./index.html">메인 문서</a>
         </nav>
       </header>
 
       <main>
-        <section class="section-block help-hero" id="quick-start">
-          <div class="section-heading">
-            <p class="eyebrow">Quick start</p>
-            <h1>처음 보는 사람도 바로 실행할 수 있게 정리했습니다.</h1>
-            <p>
-              BloManagent는 기본적으로 공개 블로그 URL만 받습니다. 설치 후에는 블로그 등록, discover, analyze 순서로 바로
-              결과를 볼 수 있습니다.
+        <section class="hero">
+          <article class="hero-copy">
+            <p class="eyebrow">Quick Start</p>
+            <h2>처음 보는 사람도 바로 따라 하는 실행 순서</h2>
+            <p class="copy">
+              BloManagent는 메인 URL만 넣어도 되고, 게시글 URL을 넣어도 됩니다. 필요한 만큼만 수집하고, 결과를 본 뒤 초기화하는
+              휘발성 워크스페이스 흐름을 기본으로 삼고 있습니다.
             </p>
+
+            <div class="pill-row">
+              <span class="pill">블로그 주소 입력</span>
+              <span class="pill">자동 수집</span>
+              <span class="pill">분석 시작</span>
+              <span class="pill">리포트 확인</span>
+            </div>
+          </article>
+
+          <article class="hero-board">
+            <div class="report-grid">
+              <article class="mini-card">
+                <span class="mini-label">입력</span>
+                <strong>블로그 / 게시글 주소</strong>
+                <p>게시글 주소를 넣으면 가능한 범위에서 블로그 기준으로 정규화합니다.</p>
+              </article>
+              <article class="mini-card">
+                <span class="mini-label">분석</span>
+                <strong>algorithm 기본</strong>
+                <p>등급 계산은 algorithm이 맡고, AI는 필요할 때만 서술 보강용으로 씁니다.</p>
+              </article>
+            </div>
+          </article>
+        </section>
+
+        <section class="section-block" id="quick-start">
+          <div class="section-heading">
+            <p class="eyebrow">Runbook</p>
+            <h2>실제 사용 순서</h2>
           </div>
 
-          <div class="timeline-grid">
-            <article class="timeline-card">
-              <span>01</span>
-              <h3>블로그 등록</h3>
-              <p>Tistory, Blogger, WordPress 메인 URL을 등록합니다. RSS URL은 고급 옵션입니다.</p>
+          <div class="feature-grid four">
+            <article class="feature-card">
+              <span class="feature-index">01</span>
+              <h3>주소 입력</h3>
+              <p>티스토리, 워드프레스, 블로거 메인 주소 또는 개별 게시글 주소를 입력합니다.</p>
             </article>
-            <article class="timeline-card">
-              <span>02</span>
-              <h3>Discover</h3>
-              <p>RSS, sitemap, wp-json, main fallback 순서로 공개 글을 찾습니다.</p>
+            <article class="feature-card">
+              <span class="feature-index">02</span>
+              <h3>자동 수집</h3>
+              <p>RSS, sitemap, wp-json, HTML을 이용해 공개 게시글 후보를 모으고 검증합니다.</p>
             </article>
-            <article class="timeline-card">
-              <span>03</span>
-              <h3>Analyze Now</h3>
-              <p>algorithm 엔진이 게시글별 qualityScore와 개선 포인트를 계산합니다.</p>
+            <article class="feature-card">
+              <span class="feature-index">03</span>
+              <h3>분석 시작</h3>
+              <p>게시글별 등급, 강한 신호, 약한 신호, 개선 제안, raw metric을 생성합니다.</p>
             </article>
-            <article class="timeline-card">
-              <span>04</span>
-              <h3>우선순위 확인</h3>
-              <p>낮은 점수 글과 반복 이슈를 대시보드에서 바로 확인합니다.</p>
+            <article class="feature-card">
+              <span class="feature-index">04</span>
+              <h3>리포트 확인</h3>
+              <p>Best/Worst 글, 분포, 병목, 우선 실행 항목을 보고 필요한 수정만 바로 정리합니다.</p>
             </article>
           </div>
         </section>
 
-        <section class="section-block" id="score">
+        <section class="section-block" id="grade-system">
           <div class="section-heading">
-            <p class="eyebrow">qualityScore</p>
-            <h2>대표 점수는 블로그 평균보다 게시글 단위 qualityScore입니다.</h2>
+            <p class="eyebrow">Grade System</p>
+            <h2>화면은 S부터 F까지, 내부 계산은 qualityScore 기반</h2>
             <p>
-              EBI 같은 종합 지표는 제거했고, 지금은 각 글을 설명 가능한 기준으로 먼저 진단합니다. AI를 켜더라도 점수 자체는
-              algorithm이 고정 계산합니다.
+              사용자 입장에서는 숫자보다 등급이 더 빠르게 읽히기 때문에, UI와 리포트는 등급 중심으로 바꿨습니다. 다만 내부적으로는
+              qualityScore를 계산한 뒤 S~F로 변환합니다.
             </p>
           </div>
 
-          <div class="card-grid five">
-            <article class="feature-card">
-              <span class="feature-index">A</span>
-              <h3>headlineScore</h3>
-              <p>제목 선명도와 첫 문단 훅이 충분한지 봅니다.</p>
+          <div class="table-grid three">
+            <article class="table-card">
+              <h3>상위 5개 축</h3>
+              <ul class="list-block">
+                <li>headlineScore</li>
+                <li>readabilityScore</li>
+                <li>valueScore</li>
+                <li>originalityScore</li>
+                <li>searchFitScore</li>
+              </ul>
             </article>
-            <article class="feature-card">
-              <span class="feature-index">B</span>
-              <h3>readabilityScore</h3>
-              <p>소제목, 문단 길이, 전개 구조를 기준으로 읽기 편한지 봅니다.</p>
+            <article class="table-card">
+              <h3>화면에 보이는 정보</h3>
+              <ul class="list-block">
+                <li>S~F 등급</li>
+                <li>Best / Worst 글</li>
+                <li>강한 신호 / 약한 신호</li>
+                <li>개선 제안</li>
+              </ul>
             </article>
-            <article class="feature-card">
-              <span class="feature-index">C</span>
-              <h3>valueScore</h3>
-              <p>실행 가능한 정보, 예시, 체크리스트가 충분한지 확인합니다.</p>
+            <article class="table-card">
+              <h3>등급 구간</h3>
+              <ul class="list-block">
+                <li>S: 90+</li>
+                <li>A: 80+</li>
+                <li>B: 65+</li>
+                <li>C: 55+</li>
+                <li>D: 45+</li>
+                <li>F: 45 미만</li>
+              </ul>
             </article>
-            <article class="feature-card">
-              <span class="feature-index">D</span>
-              <h3>originalityScore</h3>
-              <p>차별점, 경험 기반 설명, 비교 관점이 살아 있는지 점검합니다.</p>
-            </article>
-            <article class="feature-card">
-              <span class="feature-index">E</span>
-              <h3>searchFitScore</h3>
-              <p>검색 의도 정렬, 질문형 소제목, SEO 잠재력을 반영합니다.</p>
-            </article>
-          </div>
-
-          <div class="formula-strip">
-            <div class="formula-chip">80 이상: excellent</div>
-            <div class="formula-chip">65-79: solid</div>
-            <div class="formula-chip">50-64: watch</div>
-            <div class="formula-chip">49 이하: needs-work</div>
           </div>
         </section>
 
-        <section class="section-block" id="tistory">
+        <section class="section-block" id="tistory-rule">
           <div class="section-heading">
-            <p class="eyebrow">Tistory strict mode</p>
-            <h2>왜 어떤 티스토리는 글이 12개쯤인데 56개처럼 잡히는가</h2>
+            <p class="eyebrow">Tistory Rule</p>
+            <h2>티스토리에서 글 수가 부풀어 보이는 문제를 막는 방식</h2>
             <p>
-              티스토리 sitemap과 메인 링크에는 실제 글 외에 category, tag, archive, guestbook이 섞일 수 있습니다.
-              BloManagent는 이를 막기 위해 verified post만 집계하는 strict discovery를 적용했습니다.
+              티스토리는 sitemap과 메인 링크에 비게시글 URL이 섞일 수 있습니다. 그래서 “홈에서는 12개쯤 보이는데 앱에서는 56개로
+              인식한다” 같은 문제가 발생할 수 있었습니다. 현재는 strict verified-post discovery로 이 문제를 구조적으로 막았습니다.
             </p>
           </div>
 
-          <div class="card-grid three">
+          <div class="feature-grid three">
             <article class="feature-card">
               <span class="feature-index">Gate 1</span>
               <h3>URL 규칙</h3>
-              <p><code>/{숫자}</code>, <code>/entry/...</code>만 허용하고 category, tag, archive 경로는 차단합니다.</p>
+              <p><code>/{숫자}</code>, <code>/entry/...</code>만 통과시키고 category, tag, archive, guestbook 등은 제외합니다.</p>
             </article>
             <article class="feature-card">
               <span class="feature-index">Gate 2</span>
-              <h3>실제 페이지 fetch</h3>
-              <p>RSS와 sitemap에서 찾은 URL도 실제 페이지를 다시 가져와 article marker를 확인합니다.</p>
+              <h3>실제 페이지 확인</h3>
+              <p>RSS와 sitemap에서 찾은 URL을 다시 fetch해 article marker가 있는지 확인합니다.</p>
             </article>
             <article class="feature-card">
               <span class="feature-index">Gate 3</span>
-              <h3>verified / excluded 상태</h3>
-              <p>애매한 URL은 삭제하지 않고 내부적으로 excluded로 남기되, 화면 집계와 분석 대상에서는 제외합니다.</p>
+              <h3>verified / excluded 분리</h3>
+              <p>애매한 URL은 삭제하지 않고 excluded로 보관하되, 집계와 분석 대상에서는 빼줍니다.</p>
             </article>
           </div>
 
-          <div class="case-grid">
-            <article class="panel case-metric">
-              <span class="tiny-label">Source order</span>
-              <strong>RSS → sitemap → main fallback</strong>
-              <p>main 링크는 RSS와 sitemap이 둘 다 0건일 때만 최후 fallback으로 사용합니다.</p>
-            </article>
-            <article class="panel case-metric">
-              <span class="tiny-label">Storybeing</span>
-              <strong>14 verified posts</strong>
-              <p>rss 10 / sitemap 4 / main 0 / wp-json 0으로 재검증되었습니다.</p>
-            </article>
+          <div class="table-card">
+            <h3>storybeing.tistory.com 현재 기준</h3>
+            <ul class="list-block">
+              <li>verified posts: 14</li>
+              <li>rss: 10</li>
+              <li>sitemap: 4</li>
+              <li>main: 0</li>
+              <li>wp-json: 0</li>
+            </ul>
+          </div>
+        </section>
+
+        <section class="section-block" id="policy">
+          <div class="section-heading">
+            <p class="eyebrow">Policy Scope</p>
+            <h2>공개 범위만 다루고, 정책 리스크는 보수적으로 처리합니다.</h2>
+          </div>
+
+          <div class="table-card">
+            <table class="matrix">
+              <thead>
+                <tr>
+                  <th>항목</th>
+                  <th>현재 정책</th>
+                  <th>메모</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>비공개 글</td>
+                  <td><span class="status-chip risk">수집 안 함</span></td>
+                  <td>로그인이나 쿠키가 필요한 영역은 읽지 않습니다.</td>
+                </tr>
+                <tr>
+                  <td>관리자 통계</td>
+                  <td><span class="status-chip risk">수집 안 함</span></td>
+                  <td>오너 전용 지표는 v1 범위에서 제외합니다.</td>
+                </tr>
+                <tr>
+                  <td>Naver Blog</td>
+                  <td><span class="status-chip watch">기본 비활성</span></td>
+                  <td><code>allowNaverPublicCrawl=false</code>가 기본값입니다.</td>
+                </tr>
+                <tr>
+                  <td>AI 엔진</td>
+                  <td><span class="status-chip neutral">선택형</span></td>
+                  <td>Ollama, OpenAI, Google은 설명 문장 보강용입니다.</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </section>
 
         <section class="section-block">
           <div class="section-heading">
-            <p class="eyebrow">Policy notes</p>
-            <h2>공개 데이터만 다루고, 정책 리스크는 보수적으로 봅니다.</h2>
+            <p class="eyebrow">Troubleshooting</p>
+            <h2>자주 생기는 질문</h2>
           </div>
 
-          <div class="card-grid three">
-            <article class="feature-card">
-              <span class="feature-index">01</span>
-              <h3>공개 페이지만 요청</h3>
-              <p>로그인 쿠키, 비공개 글, 관리자 통계는 수집하지 않습니다.</p>
+          <div class="table-grid three">
+            <article class="table-card">
+              <h3>글 수가 실제보다 많아 보여요</h3>
+              <p>예전 false positive가 남았을 수 있습니다. 다시 수집을 실행하면 verified 기준으로 재분류됩니다.</p>
             </article>
-            <article class="feature-card">
-              <span class="feature-index">02</span>
-              <h3>Naver는 opt-in</h3>
-              <p>정책 리스크 때문에 기본값은 <code>allowNaverPublicCrawl=false</code> 입니다.</p>
+            <article class="table-card">
+              <h3>점수 대신 왜 등급으로 보이나요</h3>
+              <p>사용자가 해석하기 쉽도록 화면은 S~F 등급 중심으로 바꿨고, 내부 점수는 계속 계산됩니다.</p>
             </article>
-            <article class="feature-card">
-              <span class="feature-index">03</span>
-              <h3>LLM은 선택형</h3>
-              <p>OpenAI, Google, Ollama는 설명 문장 보강 용도이며, 기본 점수 계산은 algorithm이 맡습니다.</p>
-            </article>
-          </div>
-        </section>
-
-        <section class="section-block" id="series">
-          <div class="section-heading">
-            <p class="eyebrow">Step series</p>
-            <h2>노션과 티스토리용 Step 1~5 글감도 같이 정리했습니다.</h2>
-            <p>
-              아래 Step 문서는 구현기이면서 동시에 검색 유입을 노릴 수 있는 블로그형 구조로 작성했습니다. 현재는
-              <code>docs/notion/BloManagent</code> 폴더에 원고를 두었고, 노션 페이지 권한이 열리면 바로 하위 페이지로 생성할 수
-              있습니다.
-            </p>
-            <p>
-              자동 생성 스크립트를 쓰려면 대상 페이지를 integration <code>donggri</code>에 먼저 공유해야 합니다.
-            </p>
-          </div>
-
-          <div class="timeline-grid">
-            <article class="timeline-card">
-              <span>Step 1</span>
-              <h3>메인 URL 기반 기획</h3>
-              <p>문제 정의, 로컬 중심 워크플로우, 왜 URL-only가 중요한지 다룹니다.</p>
-            </article>
-            <article class="timeline-card">
-              <span>Step 2</span>
-              <h3>SQLite와 공개 피드 수집</h3>
-              <p>RSS, sitemap, wp-json, HTML fallback 구조를 다룹니다.</p>
-            </article>
-            <article class="timeline-card">
-              <span>Step 3</span>
-              <h3>LLM 없이 점수 계산</h3>
-              <p>qualityScore를 설명 가능한 규칙 기반으로 계산하는 과정을 다룹니다.</p>
-            </article>
-            <article class="timeline-card">
-              <span>Step 4</span>
-              <h3>대시보드와 문서 UX</h3>
-              <p>README, GitHub Pages, 도움말을 제품 문서처럼 재구성한 이유를 설명합니다.</p>
-            </article>
-            <article class="timeline-card">
-              <span>Step 5</span>
-              <h3>strict verified-post discovery</h3>
-              <p>티스토리 오탐 문제를 어떻게 설계적으로 막았는지 정리합니다.</p>
+            <article class="table-card">
+              <h3>AI 없이도 되나요</h3>
+              <p>됩니다. 알고리즘만으로 수집, 분석, 리포트, 대시보드 흐름이 완성되도록 설계했습니다.</p>
             </article>
           </div>
         </section>
@@ -232,7 +252,7 @@
 
       <footer class="footer">
         <span>BloManagent manual</span>
-        <a href="./index.html">소개 페이지로 돌아가기</a>
+        <a href="./index.html">메인 문서로 돌아가기</a>
       </footer>
     </div>
   </body>

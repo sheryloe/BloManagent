@@ -6,6 +6,7 @@ export const platformNameSchema = z.enum(["blogger", "tistory", "naver", "wordpr
 export const analysisModeSchema = z.enum(["fast", "balanced", "deep", "budget"]);
 export const runScopeSchema = z.enum(["latest7", "latest30", "newOnly", "selected", "full"]);
 export const qualityStatusSchema = z.enum(["excellent", "solid", "watch", "needs-work"]);
+export const qualityGradeSchema = z.enum(["S", "A", "B", "C", "D", "F"]);
 
 export const blogSchema = z.object({
   id: z.string(),
@@ -33,14 +34,65 @@ export const blogWithStatsSchema = blogSchema.extend({
   analyzedPostCount: z.number().int().nonnegative(),
   watchPostCount: z.number().int().nonnegative(),
   topIssues: z.array(z.string()).max(3),
+  distinctQualityScoreCount: z.number().int().nonnegative(),
+  scoreRangeMin: z.number().nullable(),
+  scoreRangeMax: z.number().nullable(),
+  repeatedTitleWarningCount: z.number().int().nonnegative(),
   latestRunId: z.string().nullable(),
   latestRunAt: z.string().nullable(),
   latestQualityScore: z.number().nullable(),
+  latestQualityGrade: qualityGradeSchema.nullable(),
   previousQualityScore: z.number().nullable(),
+  previousQualityGrade: qualityGradeSchema.nullable(),
   lastCrawlAt: z.string().nullable(),
 });
 
-export const postAnalysisSchema = z.object({
+export const signalBreakdownSchema = z.object({
+  titleLengthFit: z.number().int().min(0).max(100),
+  titleSpecificity: z.number().int().min(0).max(100),
+  titleIntentMarker: z.number().int().min(0).max(100),
+  hookPreview: z.number().int().min(0).max(100),
+  titleBodyAlignment: z.number().int().min(0).max(100),
+  genericTitlePenalty: z.number().int().min(0).max(100),
+  paragraphBalance: z.number().int().min(0).max(100),
+  headingCoverage: z.number().int().min(0).max(100),
+  listCoverage: z.number().int().min(0).max(100),
+  sentencePace: z.number().int().min(0).max(100),
+  scanability: z.number().int().min(0).max(100),
+  concreteDetailDensity: z.number().int().min(0).max(100),
+  actionability: z.number().int().min(0).max(100),
+  exampleCoverage: z.number().int().min(0).max(100),
+  referenceCoverage: z.number().int().min(0).max(100),
+  completeness: z.number().int().min(0).max(100),
+  lexicalVariety: z.number().int().min(0).max(100),
+  experienceSignal: z.number().int().min(0).max(100),
+  siblingUniqueness: z.number().int().min(0).max(100),
+  redundancyPenalty: z.number().int().min(0).max(100),
+  titleIntentMatch: z.number().int().min(0).max(100),
+  keywordAlignment: z.number().int().min(0).max(100),
+  faqCoverage: z.number().int().min(0).max(100),
+  longTailSpecificity: z.number().int().min(0).max(100),
+});
+
+export const contentMetricsSchema = z.object({
+  contentLength: z.number().int().nonnegative(),
+  paragraphCount: z.number().int().nonnegative(),
+  avgParagraphLength: z.number().int().nonnegative(),
+  sentenceCount: z.number().int().nonnegative(),
+  headingCount: z.number().int().nonnegative(),
+  listCount: z.number().int().nonnegative(),
+  questionCount: z.number().int().nonnegative(),
+  faqCount: z.number().int().nonnegative(),
+  numericTokenCount: z.number().int().nonnegative(),
+  stepMarkerCount: z.number().int().nonnegative(),
+  referenceCount: z.number().int().nonnegative(),
+  uniqueTokenRatio: z.number().min(0).max(1),
+  titleBodyOverlapRatio: z.number().min(0).max(1),
+  duplicateTitleCount: z.number().int().nonnegative(),
+  siblingTopicOverlapRatio: z.number().min(0).max(1),
+});
+
+export const postNarrativeSchema = z.object({
   summary: z.string(),
   targetAudienceGuess: z.string(),
   intentGuess: z.string(),
@@ -49,6 +101,10 @@ export const postAnalysisSchema = z.object({
   weaknesses: z.array(z.string()).max(10),
   improvements: z.array(z.string()).max(10),
   seoNotes: z.array(z.string()).max(10),
+  engagementAdjustmentNote: z.string(),
+});
+
+export const postAnalysisSchema = postNarrativeSchema.extend({
   titleStrength: z.number().int().min(0).max(100),
   hookStrength: z.number().int().min(0).max(100),
   structureScore: z.number().int().min(0).max(100),
@@ -64,7 +120,11 @@ export const postAnalysisSchema = z.object({
   searchFitScore: z.number().int().min(0).max(100),
   qualityScore: z.number().int().min(0).max(100),
   qualityStatus: qualityStatusSchema,
-  engagementAdjustmentNote: z.string(),
+  qualityGrade: qualityGradeSchema,
+  signalBreakdown: signalBreakdownSchema,
+  contentMetrics: contentMetricsSchema,
+  topScoreDrivers: z.array(z.string()).max(5),
+  topScoreRisks: z.array(z.string()).max(5),
 });
 
 export const blogScoreSchema = z.object({
@@ -85,6 +145,7 @@ export const blogScoreSchema = z.object({
   engagementScore: z.number(),
   qualityScore: z.number(),
   status: qualityStatusSchema,
+  qualityGrade: qualityGradeSchema,
   reasons: z.array(z.string()),
 });
 
@@ -191,7 +252,10 @@ export const postDiagnosticSchema = z.object({
   publishedAt: z.string().nullable(),
   qualityScore: z.number().min(0).max(100),
   qualityStatus: qualityStatusSchema,
+  qualityGrade: qualityGradeSchema,
   topImprovements: z.array(z.string()).max(2),
+  weakSignals: z.array(z.string()).max(3),
+  contentMetrics: contentMetricsSchema,
   summary: z.string().nullable(),
 });
 
@@ -221,6 +285,8 @@ export const blogDiscoveryResultSchema = z.object({
 
 export const reportSchema = z.object({
   id: z.string(),
+  blogId: z.string(),
+  blogName: z.string(),
   runId: z.string(),
   weekStart: z.string(),
   weekEnd: z.string(),

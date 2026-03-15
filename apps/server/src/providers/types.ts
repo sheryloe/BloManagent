@@ -2,10 +2,19 @@ import type {
   AnalysisMode,
   AnalysisEngine,
   AnalysisSummary,
+  ContentMetrics,
   PlatformName,
   PostAnalysis,
+  PostNarrative,
   Recommendation,
 } from "@blog-review/shared";
+
+export interface PostSiblingContext {
+  duplicateTitleCount: number;
+  siblingTopicOverlapRatio: number;
+  siblingOverlapKeywords: string[];
+  relatedTitleSamples: string[];
+}
 
 export interface AnalyzePostInput {
   blogName: string;
@@ -13,7 +22,8 @@ export interface AnalyzePostInput {
   postTitle: string;
   postUrl: string;
   publishedAt?: string | null;
-  content: string;
+  contentText: string;
+  contentHtml?: string | null;
   analysisMode: AnalysisMode;
   maxOutputTokens: number;
   engagement?: {
@@ -22,6 +32,8 @@ export interface AnalyzePostInput {
     sympathyCount?: number | null;
     viewsCount?: number | null;
   };
+  contentMetrics?: ContentMetrics;
+  siblingContext?: PostSiblingContext;
 }
 
 export interface SummarizeWeekInput {
@@ -73,7 +85,7 @@ export interface ProviderSettingsRow {
 
 export interface AIProvider {
   name: AnalysisEngine;
-  analyzePost(input: AnalyzePostInput, settings: ProviderSettingsRow): Promise<ProviderResult<PostAnalysis>>;
+  analyzePost(input: AnalyzePostInput, settings: ProviderSettingsRow): Promise<ProviderResult<PostNarrative>>;
   summarizeWeek(input: SummarizeWeekInput, settings: ProviderSettingsRow): Promise<ProviderResult<AnalysisSummary>>;
   generateRecommendations(
     input: RecommendationInput,

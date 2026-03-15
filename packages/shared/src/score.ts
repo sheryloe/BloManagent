@@ -1,4 +1,5 @@
 export type QualityStatus = "excellent" | "solid" | "watch" | "needs-work";
+export type QualityGrade = "S" | "A" | "B" | "C" | "D" | "F";
 
 export interface QualityScoreInput {
   titleStrength: number;
@@ -19,6 +20,7 @@ export interface QualityComponents {
   searchFitScore: number;
   qualityScore: number;
   qualityStatus: QualityStatus;
+  qualityGrade: QualityGrade;
 }
 
 const clamp = (value: number) => Math.max(0, Math.min(100, Math.round(value)));
@@ -33,6 +35,17 @@ export const qualityStatus = (score: number): QualityStatus => {
   if (score >= 50) return "watch";
   return "needs-work";
 };
+
+export const qualityGrade = (score: number): QualityGrade => {
+  if (score >= 90) return "S";
+  if (score >= 80) return "A";
+  if (score >= 65) return "B";
+  if (score >= 55) return "C";
+  if (score >= 45) return "D";
+  return "F";
+};
+
+export const qualityGradeLabel = (score: number) => `${qualityGrade(score)} grade`;
 
 export const calculateQualityComponents = (input: QualityScoreInput): QualityComponents => {
   const headlineScore = clamp(average([input.titleStrength, input.hookStrength]));
@@ -50,5 +63,6 @@ export const calculateQualityComponents = (input: QualityScoreInput): QualityCom
     searchFitScore,
     qualityScore,
     qualityStatus: qualityStatus(qualityScore),
+    qualityGrade: qualityGrade(qualityScore),
   };
 };

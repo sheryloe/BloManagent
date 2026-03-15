@@ -93,8 +93,25 @@ export const tistoryAdapter: BlogPlatformAdapter = {
       throw new Error("Not a Tistory post page.");
     }
 
-    const title = selectText($, [".title-article", "h1", "title"]);
-    const content = selectHtml($, [".tt_article_useless_p_margin", ".article-view", ".entry-content", "article"]);
+    const title = selectText($, [
+      "meta[property='og:title']",
+      "meta[name='title']",
+      "meta[name='twitter:title']",
+      ".title-article",
+      ".post-header h1",
+      ".inner-article h1",
+      "title",
+      "h1",
+    ]);
+    const content = selectHtml($, [
+      ".tt_article_useless_p_margin",
+      ".contents_style",
+      ".article-view",
+      ".entry-content",
+      ".post-content",
+      ".post-article",
+      "article",
+    ]);
     return buildPost(
       normalizeUrl(page.url),
       title,

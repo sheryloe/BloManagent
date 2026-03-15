@@ -1,7 +1,7 @@
-import { postAnalysisSchema, recommendationSchema, weeklySummarySchema } from "@blog-review/shared";
+import { postNarrativeSchema, recommendationSchema, weeklySummarySchema } from "@blog-review/shared";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { secretStore } from "../security/secret-store";
-import { heuristicAnalysisSummary, heuristicPostAnalysis, heuristicRecommendations } from "../services/heuristics";
+import { buildNarrativeFromAnalysis, heuristicAnalysisSummary, heuristicPostAnalysis, heuristicRecommendations } from "../services/heuristics";
 import { buildAnalyzePostPrompt, buildRecommendationsPrompt, buildWeeklySummaryPrompt } from "../templates/prompts";
 import type {
   AIProvider,
@@ -54,8 +54,11 @@ class GoogleProvider implements AIProvider {
       model: settings.model,
       schemaName: "post_analysis",
       prompt: buildAnalyzePostPrompt(input),
-      schema: zodToJsonSchema(postAnalysisSchema),
-      fallback: () => heuristicPostAnalysis(input),
+      schema: zodToJsonSchema(postNarrativeSchema),
+      fallback: () => ({
+        data: buildNarrativeFromAnalysis(heuristicPostAnalysis(input).data),
+        usage: { inputTokens: 0, outputTokens: 0, estimatedCost: 0 },
+      }),
       maxOutputTokens: settings.maxOutputTokens,
     });
   }

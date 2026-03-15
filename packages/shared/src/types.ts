@@ -11,12 +11,15 @@ import type {
   dashboardResponseSchema,
   discoverySourceCountsSchema,
   engineSettingsSchema,
+  contentMetricsSchema,
   postAnalysisSchema,
+  postNarrativeSchema,
   postDiagnosticSchema,
   recommendationSchema,
   reportSchema,
   runDetailsSchema,
   runSchema,
+  signalBreakdownSchema,
   settingsPayloadSchema,
 } from "./schemas";
 
@@ -27,6 +30,9 @@ export type DiscoverySourceCounts = z.infer<typeof discoverySourceCountsSchema>;
 export type BlogDiscoveryResult = z.infer<typeof blogDiscoveryResultSchema>;
 export type AnalyzeRequest = z.infer<typeof analyzeRequestSchema>;
 export type PostAnalysis = z.infer<typeof postAnalysisSchema>;
+export type PostNarrative = z.infer<typeof postNarrativeSchema>;
+export type SignalBreakdown = z.infer<typeof signalBreakdownSchema>;
+export type ContentMetrics = z.infer<typeof contentMetricsSchema>;
 export type AnalysisSummary = z.infer<typeof analysisSummarySchema>;
 export type WeeklySummary = AnalysisSummary;
 export type Recommendation = z.infer<typeof recommendationSchema>;

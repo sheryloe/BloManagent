@@ -1,10 +1,11 @@
 import { eq } from "drizzle-orm";
 import type { AppSettings, Blog, BlogCreateInput, BlogWithStats } from "@blog-review/shared";
-import { blogCreateSchema, blogSchema, blogWithStatsSchema, calculateQualityComponents } from "@blog-review/shared";
+import { blogCreateSchema, blogSchema, blogWithStatsSchema, qualityGrade } from "@blog-review/shared";
 import { db, sqlite } from "../db/client";
 import { blogs, postEngagementSnapshots, posts } from "../db/schema";
 import { discoverPosts, getAdapter, resolvePlatform } from "../platforms";
-import { createId, nowIso, safeJsonParse, sha256, toBoolean } from "../lib/utils";
+import { createId, normalizeUrl, nowIso, safeJsonParse, sha256, toBoolean } from "../lib/utils";
+import { resolveNaverBlogId } from "../platforms/naver";
 import { topIssuesFromAnalysis } from "./heuristics";
 import { getAppSettings } from "./settings-service";
 
@@ -18,6 +19,10 @@ type DiscoverySourceName = "rss" | "sitemap" | "main" | "wp-json";
 type ExistingStoredPost = {
   id: string;
   url: string;
+  title: string | null;
+  published_at: string | null;
+  category_name: string | null;
+  tags_json: string | null;
   content_hash: string | null;
   crawl_status: string | null;
   discovery_source: string | null;
@@ -57,30 +62,53 @@ const deriveBlogName = (mainUrl: string) => {
   return normalizeHost(url.hostname);
 };
 
-const calculateQualityFromAverages = (row: Record<string, unknown>) =>
-  calculateQualityComponents({
-    titleStrength: Number(row.avg_title_strength ?? 0),
-    hookStrength: Number(row.avg_hook_strength ?? 0),
-    structureScore: Number(row.avg_structure_score ?? 0),
-    informationDensityScore: Number(row.avg_information_density_score ?? 0),
-    practicalityScore: Number(row.avg_practicality_score ?? 0),
-    differentiationScore: Number(row.avg_differentiation_score ?? 0),
-    seoPotentialScore: Number(row.avg_seo_potential_score ?? 0),
-    audienceFitScore: Number(row.avg_audience_fit_score ?? 0),
-  });
+const normalizeRegistrationTarget = async (inputUrl: string, override?: Blog["platform"]) => {
+  const adapter = await resolvePlatform(inputUrl, override);
+  const url = new URL(inputUrl);
+  const normalizedInput = normalizeUrl(inputUrl);
 
-const calculateQualityFromPostRow = (row: Record<string, unknown> | null) => {
-  if (!row || row.title_strength == null) return null;
-  return calculateQualityComponents({
-    titleStrength: Number(row.title_strength ?? 0),
-    hookStrength: Number(row.hook_strength ?? 0),
-    structureScore: Number(row.structure_score ?? 0),
-    informationDensityScore: Number(row.information_density_score ?? 0),
-    practicalityScore: Number(row.practicality_score ?? 0),
-    differentiationScore: Number(row.differentiation_score ?? 0),
-    seoPotentialScore: Number(row.seo_potential_score ?? 0),
-    audienceFitScore: Number(row.audience_fit_score ?? 0),
-  });
+  if (adapter.platform === "naver") {
+    const blogId = await resolveNaverBlogId(inputUrl);
+    if (blogId) {
+      return {
+        adapter,
+        mainUrl: `https://blog.naver.com/${blogId}`,
+      };
+    }
+  }
+
+  if (adapter.isPostUrl(url)) {
+    return {
+      adapter,
+      mainUrl: new URL("/", url).toString(),
+    };
+  }
+
+  return {
+    adapter,
+    mainUrl: normalizedInput,
+  };
+};
+
+const getBlogRowByMainUrl = async (mainUrl: string) => {
+  const row = await db.select().from(blogs).where(eq(blogs.mainUrl, mainUrl)).get();
+  return row ?? null;
+};
+
+const toNullableNumber = (value: unknown) => (value == null ? null : Number(value));
+
+const scoreSnapshotFromRow = (row: Record<string, unknown> | null) => {
+  if (!row || row.quality_score == null) return null;
+  return {
+    qualityScore: Number(row.quality_score ?? 0),
+    qualityStatus: String(row.quality_status ?? "watch"),
+    qualityGrade: qualityGrade(Number(row.quality_score ?? 0)),
+    headlineScore: Number(row.headline_score ?? 0),
+    readabilityScore: Number(row.readability_score ?? 0),
+    valueScore: Number(row.value_score ?? 0),
+    originalityScore: Number(row.originality_score ?? 0),
+    searchFitScore: Number(row.search_fit_score ?? 0),
+  };
 };
 
 const deletePostsWithArtifacts = (postIds: string[]) => {
@@ -174,6 +202,10 @@ const excludeStoredPost = (
     existingByUrl.set(input.url, {
       id,
       url: input.url,
+      title: null,
+      published_at: null,
+      category_name: null,
+      tags_json: JSON.stringify([]),
       content_hash: null,
       crawl_status: EXCLUDED_CRAWL_STATUS,
       discovery_source: input.source,
@@ -244,14 +276,12 @@ const aggregatedScoreRowsForBlog = (blogId: string, limit: number) =>
       SELECT
         ar.id as run_id,
         ar.started_at,
-        AVG(pa.title_strength) as avg_title_strength,
-        AVG(pa.hook_strength) as avg_hook_strength,
-        AVG(pa.structure_score) as avg_structure_score,
-        AVG(pa.information_density_score) as avg_information_density_score,
-        AVG(pa.practicality_score) as avg_practicality_score,
-        AVG(pa.differentiation_score) as avg_differentiation_score,
-        AVG(pa.seo_potential_score) as avg_seo_potential_score,
-        AVG(pa.audience_fit_score) as avg_audience_fit_score
+        AVG(pa.quality_score) as quality_score,
+        AVG(pa.headline_score) as headline_score,
+        AVG(pa.readability_score) as readability_score,
+        AVG(pa.value_score) as value_score,
+        AVG(pa.originality_score) as originality_score,
+        AVG(pa.search_fit_score) as search_fit_score
       FROM analysis_run_targets art
       JOIN analysis_runs ar ON ar.id = art.run_id
       JOIN post_analyses pa ON pa.run_id = ar.id
@@ -264,6 +294,27 @@ const aggregatedScoreRowsForBlog = (blogId: string, limit: number) =>
       `,
     )
     .all(blogId, limit) as Array<Record<string, unknown>>;
+
+const repeatedTitleWarningCountForRun = (runId: string | null) => {
+  if (!runId) return 0;
+  const row = sqlite
+    .prepare(
+      `
+      SELECT COUNT(*) as repeated_group_count
+      FROM (
+        SELECT lower(trim(COALESCE(p.title, p.url))) as normalized_title
+        FROM post_analyses pa
+        JOIN posts p ON p.id = pa.post_id
+        WHERE pa.run_id = ?
+          AND COALESCE(p.crawl_status, 'verified') = 'verified'
+        GROUP BY normalized_title
+        HAVING COUNT(*) > 1
+      ) repeated_titles
+      `,
+    )
+    .get(runId) as Record<string, unknown> | undefined;
+  return Number(row?.repeated_group_count ?? 0);
+};
 
 export const assertBlogCrawlAllowed = async (blog: Blog, settings?: AppSettings) => {
   const appSettings = settings ?? (await getAppSettings());
@@ -278,7 +329,7 @@ const buildIssueSnapshot = (analysisRows: Array<Record<string, unknown>>) => {
   let watchPostCount = 0;
 
   for (const row of analysisRows) {
-    const quality = calculateQualityFromPostRow(row);
+    const quality = scoreSnapshotFromRow(row);
     if (!quality) continue;
     if (quality.qualityScore < 60) watchPostCount += 1;
 
@@ -340,9 +391,8 @@ export const listBlogs = async (): Promise<BlogWithStats[]> => {
   return rows.map((row) => {
     const blogId = String(row.id);
     const latestScores = aggregatedScoreRowsForBlog(blogId, 2);
-
-    const latestQualityScore = latestScores[0] ? calculateQualityFromAverages(latestScores[0]).qualityScore : null;
-    const previousQualityScore = latestScores[1] ? calculateQualityFromAverages(latestScores[1]).qualityScore : null;
+    const latestScore = scoreSnapshotFromRow(latestScores[0] ?? null);
+    const previousScore = scoreSnapshotFromRow(latestScores[1] ?? null);
 
     const latestRunId = (row.latest_run_id as string | null) ?? null;
     const analysisRows = latestRunId
@@ -350,14 +400,13 @@ export const listBlogs = async (): Promise<BlogWithStats[]> => {
           .prepare(
             `
             SELECT
-              pa.title_strength,
-              pa.hook_strength,
-              pa.structure_score,
-              pa.information_density_score,
-              pa.practicality_score,
-              pa.differentiation_score,
-              pa.seo_potential_score,
-              pa.audience_fit_score
+              pa.headline_score,
+              pa.readability_score,
+              pa.value_score,
+              pa.originality_score,
+              pa.search_fit_score,
+              pa.quality_score,
+              pa.quality_status
             FROM post_analyses pa
             JOIN posts p ON p.id = pa.post_id
             WHERE pa.run_id = ?
@@ -369,6 +418,10 @@ export const listBlogs = async (): Promise<BlogWithStats[]> => {
       : [];
 
     const issueSnapshot = buildIssueSnapshot(analysisRows);
+    const scoreValues = analysisRows
+      .map((analysisRow) => Number(analysisRow.quality_score ?? 0))
+      .filter((value) => Number.isFinite(value));
+    const repeatedTitleWarningCount = repeatedTitleWarningCountForRun(latestRunId);
 
     return blogWithStatsSchema.parse({
       id: row.id,
@@ -385,10 +438,16 @@ export const listBlogs = async (): Promise<BlogWithStats[]> => {
       analyzedPostCount: issueSnapshot.analyzedPostCount,
       watchPostCount: issueSnapshot.watchPostCount,
       topIssues: issueSnapshot.topIssues,
+      distinctQualityScoreCount: new Set(scoreValues.map((value) => Math.round(value))).size,
+      scoreRangeMin: scoreValues.length ? Math.min(...scoreValues) : null,
+      scoreRangeMax: scoreValues.length ? Math.max(...scoreValues) : null,
+      repeatedTitleWarningCount,
       latestRunId,
       latestRunAt: (row.latest_run_at as string | null) ?? null,
-      latestQualityScore,
-      previousQualityScore,
+      latestQualityScore: latestScore?.qualityScore ?? null,
+      latestQualityGrade: latestScore ? qualityGrade(latestScore.qualityScore) : null,
+      previousQualityScore: previousScore?.qualityScore ?? null,
+      previousQualityGrade: previousScore ? qualityGrade(previousScore.qualityScore) : null,
       lastCrawlAt: (row.last_crawl_at as string | null) ?? null,
     });
   });
@@ -402,15 +461,47 @@ export const getBlog = async (id: string) => {
 
 export const createBlog = async (input: BlogCreateInput) => {
   const parsed = blogCreateSchema.parse(input);
-  const adapter = await resolvePlatform(parsed.mainUrl, parsed.platformOverride);
+  const normalized = await normalizeRegistrationTarget(parsed.mainUrl, parsed.platformOverride);
   const now = nowIso();
+  const existing = await getBlogRowByMainUrl(normalized.mainUrl);
+
+  if (existing) {
+    const nextName = parsed.name?.trim() || existing.name;
+    const nextRssUrl = parsed.rssUrl || existing.rssUrl || null;
+    const nextDescription = parsed.description ?? existing.description ?? null;
+    const nextPlatform = normalized.adapter.platform;
+    const nextIsActive = 1;
+    const shouldUpdate =
+      nextName !== existing.name ||
+      nextRssUrl !== existing.rssUrl ||
+      nextDescription !== existing.description ||
+      nextPlatform !== existing.platform ||
+      nextIsActive !== existing.isActive;
+
+    if (shouldUpdate) {
+      await db
+        .update(blogs)
+        .set({
+          name: nextName,
+          platform: nextPlatform,
+          rssUrl: nextRssUrl,
+          description: nextDescription,
+          isActive: nextIsActive,
+          updatedAt: now,
+        })
+        .where(eq(blogs.id, existing.id));
+    }
+
+    return getBlog(existing.id);
+  }
+
   const id = createId("blog");
 
   await db.insert(blogs).values({
     id,
-    name: parsed.name?.trim() || deriveBlogName(parsed.mainUrl),
-    mainUrl: parsed.mainUrl,
-    platform: adapter.platform,
+    name: parsed.name?.trim() || deriveBlogName(normalized.mainUrl),
+    mainUrl: normalized.mainUrl,
+    platform: normalized.adapter.platform,
     rssUrl: parsed.rssUrl || null,
     sitemapUrl: null,
     description: parsed.description ?? null,
@@ -426,15 +517,20 @@ export const updateBlog = async (id: string, input: Partial<BlogCreateInput & { 
   const current = await getBlog(id);
   if (!current) return null;
   const nextUrl = input.mainUrl ?? current.mainUrl;
-  const adapter = await resolvePlatform(nextUrl, input.platformOverride ?? current.platform);
+  const normalized = await normalizeRegistrationTarget(nextUrl, input.platformOverride ?? current.platform);
   const now = nowIso();
+  const duplicate = await getBlogRowByMainUrl(normalized.mainUrl);
+
+  if (duplicate && duplicate.id !== id) {
+    throw new Error("This blog URL is already registered. Reuse the existing blog entry instead.");
+  }
 
   await db
     .update(blogs)
     .set({
       name: input.name?.trim() || current.name,
-      mainUrl: nextUrl,
-      platform: adapter.platform,
+      mainUrl: normalized.mainUrl,
+      platform: normalized.adapter.platform,
       rssUrl: input.rssUrl === "" ? null : input.rssUrl ?? current.rssUrl ?? null,
       description: input.description ?? current.description ?? null,
       isActive: input.isActive == null ? (current.isActive ? 1 : 0) : input.isActive ? 1 : 0,
@@ -487,6 +583,27 @@ export const deleteBlog = async (id: string) => {
   return { success: true };
 };
 
+export const resetWorkspaceData = () => {
+  const transaction = sqlite.transaction(() => {
+    sqlite.prepare("DELETE FROM post_engagement_snapshots").run();
+    sqlite.prepare("DELETE FROM post_analyses").run();
+    sqlite.prepare("DELETE FROM recommendations").run();
+    sqlite.prepare("DELETE FROM topic_summaries").run();
+    sqlite.prepare("DELETE FROM blog_weekly_scores").run();
+    sqlite.prepare("DELETE FROM weekly_reports").run();
+    sqlite.prepare("DELETE FROM cost_logs").run();
+    sqlite.prepare("DELETE FROM run_events").run();
+    sqlite.prepare("DELETE FROM analysis_run_targets").run();
+    sqlite.prepare("DELETE FROM analysis_runs").run();
+    sqlite.prepare("DELETE FROM blog_categories").run();
+    sqlite.prepare("DELETE FROM posts").run();
+    sqlite.prepare("DELETE FROM blogs").run();
+  });
+
+  transaction();
+  return { success: true };
+};
+
 export const discoverBlogPosts = async (blogId: string) => {
   let blog = await getBlog(blogId);
   if (!blog) throw new Error("Blog not found.");
@@ -529,6 +646,7 @@ export const discoverBlogPosts = async (blogId: string) => {
     .prepare(
       `
       SELECT id, url, content_hash, crawl_status, discovery_source, exclusion_reason
+           , title, published_at, category_name, tags_json
       FROM posts
       WHERE blog_id = ?
       `,
@@ -630,12 +748,25 @@ export const discoverBlogPosts = async (blogId: string) => {
         existingByUrl.set(fetched.url, {
           id: postId,
           url: fetched.url,
+          title: nextState.title,
+          published_at: nextState.publishedAt,
+          category_name: nextState.categoryName,
+          tags_json: nextState.tagsJson,
           content_hash: hash,
           crawl_status: VERIFIED_CRAWL_STATUS,
           discovery_source: item.source,
           exclusion_reason: null,
         });
-      } else if (current.content_hash !== hash || current.crawl_status !== VERIFIED_CRAWL_STATUS) {
+      } else if (
+        current.content_hash !== hash ||
+        current.crawl_status !== VERIFIED_CRAWL_STATUS ||
+        current.title !== nextState.title ||
+        current.published_at !== nextState.publishedAt ||
+        current.category_name !== nextState.categoryName ||
+        current.tags_json !== nextState.tagsJson ||
+        current.discovery_source !== item.source ||
+        current.exclusion_reason != null
+      ) {
         await db
           .update(posts)
           .set(nextState)
@@ -645,6 +776,10 @@ export const discoverBlogPosts = async (blogId: string) => {
         storedPostId = current.id;
         existingByUrl.set(fetched.url, {
           ...current,
+          title: nextState.title,
+          published_at: nextState.publishedAt,
+          category_name: nextState.categoryName,
+          tags_json: nextState.tagsJson,
           content_hash: hash,
           crawl_status: VERIFIED_CRAWL_STATUS,
           discovery_source: item.source,
@@ -666,6 +801,10 @@ export const discoverBlogPosts = async (blogId: string) => {
         storedPostId = current.id;
         existingByUrl.set(fetched.url, {
           ...current,
+          title: nextState.title,
+          published_at: nextState.publishedAt,
+          category_name: nextState.categoryName,
+          tags_json: nextState.tagsJson,
           crawl_status: VERIFIED_CRAWL_STATUS,
           discovery_source: item.source,
           exclusion_reason: null,
@@ -732,23 +871,38 @@ export const getBlogDetail = async (id: string) => {
       `
       SELECT
         p.*,
-        (SELECT pa.summary FROM post_analyses pa JOIN analysis_runs ar ON ar.id = pa.run_id WHERE pa.post_id = p.id AND ar.status = 'completed' ORDER BY pa.created_at DESC LIMIT 1) as latest_summary,
-        (SELECT pa.topic_labels_json FROM post_analyses pa JOIN analysis_runs ar ON ar.id = pa.run_id WHERE pa.post_id = p.id AND ar.status = 'completed' ORDER BY pa.created_at DESC LIMIT 1) as latest_topics,
-        (SELECT pa.strengths_json FROM post_analyses pa JOIN analysis_runs ar ON ar.id = pa.run_id WHERE pa.post_id = p.id AND ar.status = 'completed' ORDER BY pa.created_at DESC LIMIT 1) as latest_strengths,
-        (SELECT pa.weaknesses_json FROM post_analyses pa JOIN analysis_runs ar ON ar.id = pa.run_id WHERE pa.post_id = p.id AND ar.status = 'completed' ORDER BY pa.created_at DESC LIMIT 1) as latest_weaknesses,
-        (SELECT pa.improvements_json FROM post_analyses pa JOIN analysis_runs ar ON ar.id = pa.run_id WHERE pa.post_id = p.id AND ar.status = 'completed' ORDER BY pa.created_at DESC LIMIT 1) as latest_improvements,
-        (SELECT pa.title_strength FROM post_analyses pa JOIN analysis_runs ar ON ar.id = pa.run_id WHERE pa.post_id = p.id AND ar.status = 'completed' ORDER BY pa.created_at DESC LIMIT 1) as title_strength,
-        (SELECT pa.hook_strength FROM post_analyses pa JOIN analysis_runs ar ON ar.id = pa.run_id WHERE pa.post_id = p.id AND ar.status = 'completed' ORDER BY pa.created_at DESC LIMIT 1) as hook_strength,
-        (SELECT pa.structure_score FROM post_analyses pa JOIN analysis_runs ar ON ar.id = pa.run_id WHERE pa.post_id = p.id AND ar.status = 'completed' ORDER BY pa.created_at DESC LIMIT 1) as structure_score,
-        (SELECT pa.information_density_score FROM post_analyses pa JOIN analysis_runs ar ON ar.id = pa.run_id WHERE pa.post_id = p.id AND ar.status = 'completed' ORDER BY pa.created_at DESC LIMIT 1) as information_density_score,
-        (SELECT pa.practicality_score FROM post_analyses pa JOIN analysis_runs ar ON ar.id = pa.run_id WHERE pa.post_id = p.id AND ar.status = 'completed' ORDER BY pa.created_at DESC LIMIT 1) as practicality_score,
-        (SELECT pa.differentiation_score FROM post_analyses pa JOIN analysis_runs ar ON ar.id = pa.run_id WHERE pa.post_id = p.id AND ar.status = 'completed' ORDER BY pa.created_at DESC LIMIT 1) as differentiation_score,
-        (SELECT pa.seo_potential_score FROM post_analyses pa JOIN analysis_runs ar ON ar.id = pa.run_id WHERE pa.post_id = p.id AND ar.status = 'completed' ORDER BY pa.created_at DESC LIMIT 1) as seo_potential_score,
-        (SELECT pa.audience_fit_score FROM post_analyses pa JOIN analysis_runs ar ON ar.id = pa.run_id WHERE pa.post_id = p.id AND ar.status = 'completed' ORDER BY pa.created_at DESC LIMIT 1) as audience_fit_score
+        pa.summary as latest_summary,
+        pa.topic_labels_json as latest_topics,
+        pa.strengths_json as latest_strengths,
+        pa.weaknesses_json as latest_weaknesses,
+        pa.improvements_json as latest_improvements,
+        pa.score_drivers_json as latest_drivers,
+        pa.score_risks_json as latest_risks,
+        pa.signal_breakdown_json as latest_signal_breakdown,
+        pa.content_metrics_json as latest_content_metrics,
+        pa.quality_score,
+        pa.quality_status,
+        pa.headline_score,
+        pa.readability_score,
+        pa.value_score,
+        pa.originality_score,
+        pa.search_fit_score
       FROM posts p
+      LEFT JOIN post_analyses pa ON pa.id = (
+        SELECT pa2.id
+        FROM post_analyses pa2
+        JOIN analysis_runs ar2 ON ar2.id = pa2.run_id
+        WHERE pa2.post_id = p.id
+          AND ar2.status = 'completed'
+        ORDER BY pa2.created_at DESC
+        LIMIT 1
+      )
       WHERE p.blog_id = ?
         AND COALESCE(p.crawl_status, 'verified') = 'verified'
-      ORDER BY COALESCE(p.published_at, p.created_at) DESC
+      ORDER BY
+        CASE WHEN pa.quality_score IS NULL THEN 1 ELSE 0 END,
+        pa.quality_score ASC,
+        COALESCE(p.published_at, p.created_at) DESC
       LIMIT 50
       `,
     )
@@ -756,7 +910,7 @@ export const getBlogDetail = async (id: string) => {
 
   const mappedPosts = postRows
     .map((row) => {
-      const quality = calculateQualityFromPostRow(row);
+      const quality = scoreSnapshotFromRow(row);
       return {
         id: String(row.id),
         title: String(row.title ?? row.url),
@@ -769,9 +923,15 @@ export const getBlogDetail = async (id: string) => {
         strengths: safeJsonParse(row.latest_strengths as string | null, [] as string[]),
         weaknesses: safeJsonParse(row.latest_weaknesses as string | null, [] as string[]),
         improvements: safeJsonParse(row.latest_improvements as string | null, [] as string[]),
+        topScoreDrivers: safeJsonParse(row.latest_drivers as string | null, [] as string[]),
+        topScoreRisks: safeJsonParse(row.latest_risks as string | null, [] as string[]),
+        weakSignals: safeJsonParse(row.latest_risks as string | null, [] as string[]).slice(0, 3),
+        signalBreakdown: safeJsonParse(row.latest_signal_breakdown as string | null, {}),
+        contentMetrics: safeJsonParse(row.latest_content_metrics as string | null, null),
         updatedAt: String(row.updated_at),
         qualityScore: quality?.qualityScore ?? null,
         qualityStatus: quality?.qualityStatus ?? null,
+        qualityGrade: quality?.qualityGrade ?? null,
         headlineScore: quality?.headlineScore ?? null,
         readabilityScore: quality?.readabilityScore ?? null,
         valueScore: quality?.valueScore ?? null,
@@ -786,7 +946,7 @@ export const getBlogDetail = async (id: string) => {
       return left.qualityScore - right.qualityScore;
     });
 
-  const scoreRows = aggregatedScoreRowsForBlog(id, 12);
+  const scoreRows = aggregatedScoreRowsForBlog(id, 1);
 
   const recommendationRows = sqlite
     .prepare(
@@ -814,16 +974,20 @@ export const getBlogDetail = async (id: string) => {
   return {
     blog,
     posts: mappedPosts,
-    scoreHistory: scoreRows.map((row) => {
-      const quality = calculateQualityFromAverages(row);
-      return {
-        startedAt: row.started_at,
-        qualityScore: quality.qualityScore,
-        headlineScore: quality.headlineScore,
-        readabilityScore: quality.readabilityScore,
-        valueScore: quality.valueScore,
-      };
-    }),
+    scoreHistory: scoreRows
+      .map((row) => {
+        const quality = scoreSnapshotFromRow(row);
+        if (!quality) return null;
+        return {
+          startedAt: row.started_at,
+          qualityScore: quality.qualityScore,
+          qualityGrade: quality.qualityGrade,
+          headlineScore: quality.headlineScore,
+          readabilityScore: quality.readabilityScore,
+          valueScore: quality.valueScore,
+        };
+      })
+      .filter(Boolean),
     recommendations: recommendationRows.map((row) => ({
       id: row.id,
       title: row.title,
@@ -839,7 +1003,7 @@ export const getReports = async () => {
   const rows = sqlite
     .prepare(
       `
-      SELECT wr.*, b.name as blog_name
+      SELECT wr.*, b.id as blog_id, b.name as blog_name
       FROM weekly_reports wr
       JOIN analysis_runs ar ON ar.id = wr.run_id
       JOIN analysis_run_targets art ON art.run_id = ar.id
@@ -852,6 +1016,8 @@ export const getReports = async () => {
 
   return rows.map((row) => ({
     id: row.id,
+    blogId: row.blog_id,
+    blogName: row.blog_name,
     runId: row.run_id,
     weekStart: row.week_start,
     weekEnd: row.week_end,
@@ -863,6 +1029,5 @@ export const getReports = async () => {
     nextWeekTopics: safeJsonParse(row.next_week_topics_json as string | null, [] as string[]),
     markdownReport: row.markdown_report,
     createdAt: row.created_at,
-    blogName: row.blog_name,
   }));
 };
