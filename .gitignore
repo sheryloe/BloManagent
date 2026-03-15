@@ -9,3 +9,4 @@ data
 apps/web/dist
 apps/server/dist
 packages/shared/dist
+.codex-dev.log

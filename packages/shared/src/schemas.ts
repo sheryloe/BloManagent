@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const providerNameSchema = z.enum(["google", "openai", "ollama"]);
-export const platformNameSchema = z.enum(["blogger", "tistory", "naver", "generic"]);
+export const platformNameSchema = z.enum(["blogger", "tistory", "naver", "wordpress", "generic"]);
 export const analysisModeSchema = z.enum(["fast", "balanced", "deep", "budget"]);
 export const runScopeSchema = z.enum(["latest7", "latest30", "newOnly", "selected", "full"]);
 
@@ -19,7 +19,7 @@ export const blogSchema = z.object({
 });
 
 export const blogCreateSchema = z.object({
-  name: z.string().min(1),
+  name: z.string().trim().optional().or(z.literal("")),
   mainUrl: z.string().url(),
   platformOverride: platformNameSchema.optional(),
   rssUrl: z.string().url().optional().or(z.literal("")),
@@ -169,6 +169,23 @@ export const dashboardResponseSchema = z.object({
   blogs: z.array(blogWithStatsSchema),
   latestRuns: z.array(runSchema),
   latestRecommendations: z.array(recommendationSchema.extend({ id: z.string(), createdAt: z.string() })),
+});
+
+export const discoverySourceCountsSchema = z.object({
+  rss: z.number().int().nonnegative(),
+  sitemap: z.number().int().nonnegative(),
+  main: z.number().int().nonnegative(),
+  wpJson: z.number().int().nonnegative(),
+});
+
+export const blogDiscoveryResultSchema = z.object({
+  blog: blogSchema,
+  discoveredCount: z.number().int().nonnegative(),
+  insertedCount: z.number().int().nonnegative(),
+  updatedCount: z.number().int().nonnegative(),
+  insertedPostIds: z.array(z.string()),
+  updatedPostIds: z.array(z.string()),
+  sourceCounts: discoverySourceCountsSchema,
 });
 
 export const reportSchema = z.object({

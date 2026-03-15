@@ -1,6 +1,9 @@
 import type {
   AnalyzeRequest,
+  Blog,
   BlogCreateInput,
+  BlogDiscoveryResult,
+  BlogWithStats,
   DashboardResponse,
   ProviderName,
   SettingsPayload,
@@ -25,10 +28,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   getDashboard: () => request<DashboardResponse>("/api/dashboard"),
-  getBlogs: () => request("/api/blogs"),
+  getBlogs: () => request<BlogWithStats[]>("/api/blogs"),
   getBlog: (id: string) => request(`/api/blogs/${id}`),
   createBlog: (payload: BlogCreateInput) =>
-    request("/api/blogs", {
+    request<Blog>("/api/blogs", {
       method: "POST",
       body: JSON.stringify(payload),
     }),
@@ -42,7 +45,7 @@ export const api = {
       method: "DELETE",
     }),
   discoverBlog: (id: string) =>
-    request(`/api/blogs/${id}/discover`, {
+    request<BlogDiscoveryResult>(`/api/blogs/${id}/discover`, {
       method: "POST",
       body: JSON.stringify({}),
     }),

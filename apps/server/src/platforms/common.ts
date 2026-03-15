@@ -2,27 +2,60 @@ import * as cheerio from "cheerio";
 import { XMLParser } from "fast-xml-parser";
 import { chromium } from "playwright-core";
 import { cleanText, normalizeUrl } from "../lib/utils";
-import type { FetchResult, NormalizedPost, PostEngagement } from "./types";
+import type {
+  BlogPlatformAdapter,
+  DiscoveryOverrides,
+  DiscoveryResult,
+  DiscoverySettings,
+  DiscoverySource,
+  FetchResult,
+  NormalizedPost,
+  PostEngagement,
+} from "./types";
 
 export const xmlParser = new XMLParser({
   ignoreAttributes: false,
 });
 
-export const fetchWithTimeout = async (url: string, timeoutMs = 15000): Promise<FetchResult> => {
+const discoveryKeyBySource: Record<DiscoverySource, keyof DiscoveryResult["sourceCounts"]> = {
+  rss: "rss",
+  sitemap: "sitemap",
+  main: "main",
+  "wp-json": "wpJson",
+};
+
+export const createSourceCounts = (): DiscoveryResult["sourceCounts"] => ({
+  rss: 0,
+  sitemap: 0,
+  main: 0,
+  wpJson: 0,
+});
+
+export const fetchWithTimeout = async (
+  url: string,
+  timeoutMs = 15000,
+  init: RequestInit = {},
+): Promise<FetchResult> => {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch(url, {
+      ...init,
       signal: controller.signal,
       headers: {
         "User-Agent": "BlogReviewDashboard/0.1",
         Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        ...(init.headers ?? {}),
       },
     });
+
     return {
       url: response.url,
-      html: await response.text(),
+      html: init.method === "HEAD" ? "" : await response.text(),
       status: response.status,
+      headers: Object.fromEntries(
+        Array.from(response.headers.entries()).map(([key, value]) => [key.toLowerCase(), value]),
+      ),
     };
   } finally {
     clearTimeout(timer);
@@ -43,6 +76,36 @@ export const collectLinks = (html: string, baseUrl: string) => {
       }
     })
     .filter((value): value is string => Boolean(value));
+};
+
+export const parseFeedLinks = (xml: string) => {
+  try {
+    const parsed = xmlParser.parse(xml) as Record<string, unknown>;
+    const links: string[] = [];
+    const walk = (value: unknown, keyHint?: string) => {
+      if (!value) return;
+      if (typeof value === "string") {
+        if ((keyHint === "link" || keyHint === "loc" || keyHint === "@_href") && value.startsWith("http")) {
+          links.push(value);
+        }
+        return;
+      }
+      if (Array.isArray(value)) {
+        value.forEach((item) => walk(item, keyHint));
+        return;
+      }
+      if (typeof value === "object") {
+        for (const [key, next] of Object.entries(value as Record<string, unknown>)) {
+          walk(next, key);
+        }
+      }
+    };
+
+    walk(parsed);
+    return links;
+  } catch {
+    return [];
+  }
 };
 
 export const selectText = ($: cheerio.CheerioAPI, selectors: string[]) => {
@@ -102,11 +165,12 @@ export const fetchWithPlaywright = async (url: string) => {
 export const buildPost = (
   url: string,
   title: string,
- publishedAt: string | null,
+  publishedAt: string | null,
   categoryName: string | null,
   tags: string[],
   contentRaw: string,
   contentClean: string,
+  pageHtml?: string,
 ): NormalizedPost => ({
   url,
   title,
@@ -115,6 +179,7 @@ export const buildPost = (
   tags,
   contentRaw,
   contentClean,
+  pageHtml,
 });
 
 export const emptyEngagement = (): PostEngagement => ({
@@ -123,3 +188,113 @@ export const emptyEngagement = (): PostEngagement => ({
   sympathyCount: null,
   viewsCount: null,
 });
+
+const addDiscoveredLinks = (
+  found: Map<string, DiscoverySource>,
+  sourceCounts: DiscoveryResult["sourceCounts"],
+  links: string[],
+  source: DiscoverySource,
+  mainUrl: URL,
+  adapter: Pick<BlogPlatformAdapter, "isPostUrl">,
+) => {
+  for (const link of links) {
+    try {
+      const normalized = normalizeUrl(link);
+      if (found.has(normalized)) continue;
+
+      const linkUrl = new URL(normalized);
+      if (linkUrl.hostname !== mainUrl.hostname && !linkUrl.hostname.endsWith(mainUrl.hostname)) continue;
+      if (!adapter.isPostUrl(linkUrl)) continue;
+
+      found.set(normalized, source);
+      sourceCounts[discoveryKeyBySource[source]] += 1;
+    } catch {
+      continue;
+    }
+  }
+};
+
+const buildDiscoveryOrder = (settings?: DiscoverySettings): DiscoverySource[] => {
+  const ordered: DiscoverySource[] = [];
+
+  if (settings?.rssPriority !== false) ordered.push("rss");
+  if (settings?.sitemapPriority !== false) ordered.push("sitemap");
+  ordered.push("main");
+  if (settings?.rssPriority === false) ordered.push("rss");
+  if (settings?.sitemapPriority === false) ordered.push("sitemap");
+
+  return ordered;
+};
+
+export const buildDiscoveryResult = (
+  found: Map<string, DiscoverySource>,
+  sourceCounts: DiscoveryResult["sourceCounts"],
+): DiscoveryResult => ({
+  posts: Array.from(found.entries()).map(([url, source]) => ({ url, source })),
+  sourceCounts,
+});
+
+export const runDefaultDiscovery = async (
+  adapter: BlogPlatformAdapter,
+  mainUrl: string,
+  overrides?: DiscoveryOverrides,
+  settings?: DiscoverySettings,
+  options?: {
+    loadMainPage?: (url: string) => Promise<Pick<FetchResult, "html" | "url">>;
+  },
+): Promise<DiscoveryResult> => {
+  const mainPageUrl = new URL(mainUrl);
+  const found = new Map<string, DiscoverySource>();
+  const sourceCounts = createSourceCounts();
+  const discoveryOrder = buildDiscoveryOrder(settings);
+
+  for (const source of discoveryOrder) {
+    if (source === "rss") {
+      const feedCandidates = [overrides?.rssUrl, ...adapter.feedCandidates(mainPageUrl)].filter(Boolean) as string[];
+      for (const candidate of feedCandidates) {
+        try {
+          const response = await fetchWithTimeout(candidate, 15000, {
+            headers: {
+              Accept: "application/rss+xml, application/atom+xml, application/xml;q=0.9, text/xml;q=0.8, */*;q=0.5",
+            },
+          });
+          if (response.status < 400) {
+            addDiscoveredLinks(found, sourceCounts, parseFeedLinks(response.html), "rss", mainPageUrl, adapter);
+          }
+        } catch {
+          continue;
+        }
+      }
+      continue;
+    }
+
+    if (source === "sitemap") {
+      const sitemapCandidates = [overrides?.sitemapUrl, ...adapter.sitemapCandidates(mainPageUrl)].filter(Boolean) as string[];
+      for (const candidate of sitemapCandidates) {
+        try {
+          const response = await fetchWithTimeout(candidate, 15000, {
+            headers: {
+              Accept: "application/xml, text/xml;q=0.9, */*;q=0.5",
+            },
+          });
+          if (response.status < 400) {
+            addDiscoveredLinks(found, sourceCounts, parseFeedLinks(response.html), "sitemap", mainPageUrl, adapter);
+          }
+        } catch {
+          continue;
+        }
+      }
+      continue;
+    }
+
+    try {
+      const mainPage = options?.loadMainPage ? await options.loadMainPage(mainUrl) : await fetchWithTimeout(mainUrl);
+      const baseUrl = new URL(mainPage.url || mainUrl);
+      addDiscoveredLinks(found, sourceCounts, adapter.discoverFromMainPage(baseUrl, mainPage.html), "main", mainPageUrl, adapter);
+    } catch {
+      // no-op
+    }
+  }
+
+  return buildDiscoveryResult(found, sourceCounts);
+};

@@ -3,7 +3,9 @@ import { normalizeUrl } from "./utils";
 
 describe("normalizeUrl", () => {
   it("removes tracking params and trailing slashes", () => {
-    const normalized = normalizeUrl("https://example.com/post/?utm_source=test&fbclid=123#section");
+    const normalized = normalizeUrl(
+      "https://example.com/post/?utm_source=test&fbclid=123&fromRss=true&trackingCode=rss#section",
+    );
     expect(normalized).toBe("https://example.com/post");
   });
 });

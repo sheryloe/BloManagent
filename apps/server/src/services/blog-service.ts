@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import type { Blog, BlogCreateInput, BlogWithStats } from "@blog-review/shared";
 import { blogCreateSchema, blogSchema, blogWithStatsSchema } from "@blog-review/shared";
 import { db, sqlite } from "../db/client";
@@ -11,8 +11,9 @@ import {
   recommendations,
   weeklyReports,
 } from "../db/schema";
-import { detectPlatform, discoverPosts, getAdapter } from "../platforms";
+import { discoverPosts, getAdapter, resolvePlatform } from "../platforms";
 import { createId, nowIso, safeJsonParse, sha256, toBoolean } from "../lib/utils";
+import { getAppSettings } from "./settings-service";
 
 const mapBlog = (row: typeof blogs.$inferSelect): Blog =>
   blogSchema.parse({
@@ -27,6 +28,17 @@ const mapBlog = (row: typeof blogs.$inferSelect): Blog =>
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   });
+
+const normalizeHost = (hostname: string) => hostname.replace(/^www\./, "");
+
+const deriveBlogName = (mainUrl: string) => {
+  const url = new URL(mainUrl);
+  if (url.hostname.includes("blog.naver.com") || url.hostname.includes("m.blog.naver.com")) {
+    return url.searchParams.get("blogId") ?? url.pathname.split("/").filter(Boolean)[0] ?? normalizeHost(url.hostname);
+  }
+
+  return normalizeHost(url.hostname);
+};
 
 export const listBlogs = async (): Promise<BlogWithStats[]> => {
   const rows = sqlite
@@ -110,13 +122,13 @@ export const getBlog = async (id: string) => {
 
 export const createBlog = async (input: BlogCreateInput) => {
   const parsed = blogCreateSchema.parse(input);
-  const adapter = detectPlatform(parsed.mainUrl, parsed.platformOverride);
+  const adapter = await resolvePlatform(parsed.mainUrl, parsed.platformOverride);
   const now = nowIso();
   const id = createId("blog");
 
   await db.insert(blogs).values({
     id,
-    name: parsed.name,
+    name: parsed.name?.trim() || deriveBlogName(parsed.mainUrl),
     mainUrl: parsed.mainUrl,
     platform: adapter.platform,
     rssUrl: parsed.rssUrl || null,
@@ -137,13 +149,13 @@ export const updateBlog = async (
   const current = await getBlog(id);
   if (!current) return null;
   const nextUrl = input.mainUrl ?? current.mainUrl;
-  const adapter = detectPlatform(nextUrl, input.platformOverride ?? current.platform);
+  const adapter = await resolvePlatform(nextUrl, input.platformOverride ?? current.platform);
   const now = nowIso();
 
   await db
     .update(blogs)
     .set({
-      name: input.name ?? current.name,
+      name: input.name?.trim() || current.name,
       mainUrl: nextUrl,
       platform: adapter.platform,
       rssUrl: input.rssUrl === "" ? null : input.rssUrl ?? current.rssUrl ?? null,
@@ -162,14 +174,40 @@ export const deleteBlog = async (id: string) => {
 };
 
 export const discoverBlogPosts = async (blogId: string) => {
-  const blog = await getBlog(blogId);
+  let blog = await getBlog(blogId);
   if (!blog) throw new Error("Blog not found.");
 
-  const discovered = await discoverPosts(blog.mainUrl, blog.platform, {
-    rssUrl: blog.rssUrl ?? null,
-    sitemapUrl: blog.sitemapUrl ?? null,
-  });
+  if (blog.platform === "generic") {
+    const resolved = await resolvePlatform(blog.mainUrl);
+    if (resolved.platform !== blog.platform) {
+      await db
+        .update(blogs)
+        .set({
+          platform: resolved.platform,
+          updatedAt: nowIso(),
+        })
+        .where(eq(blogs.id, blogId));
+      blog = await getBlog(blogId);
+      if (!blog) throw new Error("Blog not found.");
+    }
+  }
 
+  const appSettings = await getAppSettings();
+  const discovery = await discoverPosts(
+    blog.mainUrl,
+    blog.platform,
+    {
+      rssUrl: blog.rssUrl ?? null,
+      sitemapUrl: blog.sitemapUrl ?? null,
+    },
+    {
+      rssPriority: appSettings.rssPriority,
+      sitemapPriority: appSettings.sitemapPriority,
+    },
+  );
+
+  const discovered = discovery.posts;
+  const adapter = getAdapter(blog.platform);
   const now = nowIso();
   const existing = sqlite.prepare("SELECT id, url, content_hash FROM posts WHERE blog_id = ?").all(blogId) as Array<{
     id: string;
@@ -177,7 +215,6 @@ export const discoverBlogPosts = async (blogId: string) => {
     content_hash: string | null;
   }>;
   const existingByUrl = new Map(existing.map((item) => [item.url, item]));
-  const adapter = getAdapter(blog.platform);
   let inserted = 0;
   let updated = 0;
   const insertedPostIds: string[] = [];
@@ -236,8 +273,11 @@ export const discoverBlogPosts = async (blogId: string) => {
       }
 
       const storedPost = sqlite.prepare("SELECT id FROM posts WHERE url = ?").get(fetched.url) as { id: string } | undefined;
-      if (storedPost) {
-        const engagement = await adapter.extractEngagement(fetched.url, fetched.contentRaw || fetched.contentClean);
+      if (storedPost && appSettings.collectEngagementSnapshots) {
+        const engagement = await adapter.extractEngagement(
+          fetched.url,
+          fetched.pageHtml || fetched.contentRaw || fetched.contentClean,
+        );
         await db.insert(postEngagementSnapshots).values({
           id: createId("eng"),
           postId: storedPost.id,
@@ -261,6 +301,7 @@ export const discoverBlogPosts = async (blogId: string) => {
     updatedCount: updated,
     insertedPostIds,
     updatedPostIds,
+    sourceCounts: discovery.sourceCounts,
   };
 };
 

@@ -3,6 +3,23 @@ import { normalizeUrl } from "../lib/utils";
 import { buildPost, collectLinks, detectDate, fetchWithTimeout, numberFromText, selectHtml, selectText } from "./common";
 import type { BlogPlatformAdapter } from "./types";
 
+const blockedTistoryPrefixes = [
+  "/archive",
+  "/category",
+  "/guestbook",
+  "/manage",
+  "/media",
+  "/notice",
+  "/pages",
+  "/search",
+  "/tag",
+  "/toolbar",
+];
+
+const looksLikeTistoryPost = ($: cheerio.CheerioAPI) =>
+  selectText($, ["meta[property='og:type']"]) === "article" ||
+  Boolean(selectText($, ["meta[property='article:published_time']"]));
+
 export const tistoryAdapter: BlogPlatformAdapter = {
   platform: "tistory",
   detect(url) {
@@ -15,7 +32,13 @@ export const tistoryAdapter: BlogPlatformAdapter = {
     return [new URL("/sitemap.xml", url).toString()];
   },
   isPostUrl(url) {
-    return /^\/\d+/.test(url.pathname) || url.pathname.split("/").length >= 3;
+    const pathname = url.pathname.replace(/\/+$/, "") || "/";
+    if (pathname === "/") return false;
+    if (blockedTistoryPrefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))) {
+      return false;
+    }
+
+    return /^\/\d+$/.test(pathname) || pathname.includes("/entry/");
   },
   discoverFromMainPage(url, html) {
     return collectLinks(html, url.toString()).filter((link) => {
@@ -26,6 +49,10 @@ export const tistoryAdapter: BlogPlatformAdapter = {
   async fetchPost(url) {
     const page = await fetchWithTimeout(url);
     const $ = cheerio.load(page.html);
+    if (!looksLikeTistoryPost($)) {
+      throw new Error("Not a Tistory post page.");
+    }
+
     const title = selectText($, [".title-article", "h1", "title"]);
     const content = selectHtml($, [".tt_article_useless_p_margin", ".article-view", ".entry-content", "article"]);
     return buildPost(
@@ -39,6 +66,7 @@ export const tistoryAdapter: BlogPlatformAdapter = {
         .filter(Boolean),
       content.html,
       content.text,
+      page.html,
     );
   },
   async extractEngagement(_url, html) {

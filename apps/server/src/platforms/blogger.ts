@@ -11,6 +11,8 @@ export const bloggerAdapter: BlogPlatformAdapter = {
   feedCandidates(url) {
     return [
       new URL("/feeds/posts/default?alt=rss", url).toString(),
+      new URL("/feeds/posts/default", url).toString(),
+      new URL("/feeds/posts/default?alt=atom", url).toString(),
       new URL("/atom.xml", url).toString(),
       new URL("/rss.xml", url).toString(),
     ];
@@ -40,6 +42,7 @@ export const bloggerAdapter: BlogPlatformAdapter = {
         .filter(Boolean),
       content.html,
       content.text,
+      page.html,
     );
   },
   async extractEngagement(_url, html) {

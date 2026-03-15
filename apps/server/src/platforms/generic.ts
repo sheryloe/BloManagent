@@ -39,6 +39,7 @@ export const genericAdapter: BlogPlatformAdapter = {
         .filter(Boolean),
       content.html,
       content.text,
+      page.html,
     );
   },
   async extractEngagement(_url, html) {

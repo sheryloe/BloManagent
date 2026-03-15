@@ -14,11 +14,14 @@ export const estimateTokensFromText = (text: string) => Math.ceil(text.length / 
 
 const blockedParams = new Set([
   "fbclid",
+  "fromRss",
+  "fromrss",
   "gclid",
   "igshid",
   "ref",
   "source",
   "spm",
+  "trackingCode",
   "utm_campaign",
   "utm_content",
   "utm_medium",
