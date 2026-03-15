@@ -3,10 +3,10 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>BloManagent 사용 안내 | 운영 가이드</title>
+    <title>BloManagent 사용 안내 | 운영 매뉴얼</title>
     <meta
       name="description"
-      content="BloManagent 사용 방법, 등급 기준, 신호별 근거, 티스토리 검증 규칙, 정책 범위를 정리한 운영 가이드입니다."
+      content="BloManagent 입력 방식, 등급 기준, 신호별 근거, 티스토리 검증 규칙, 정책 범위를 정리한 운영 매뉴얼입니다."
     >
     <link rel="canonical" href="https://sheryloe.github.io/BloManagent/help.html">
     <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
@@ -30,11 +30,11 @@
         </a>
 
         <nav class="topnav" aria-label="문서 탐색">
-          <a href="#quick-start">빠른 시작</a>
-          <a href="#grade">등급 구조</a>
-          <a href="#evidence">근거 표시</a>
-          <a href="#tistory">티스토리 규칙</a>
-          <a href="#policy">정책 범위</a>
+          <a href="#quick-start">시작</a>
+          <a href="#grade">등급</a>
+          <a href="#evidence">근거</a>
+          <a href="#tistory">티스토리</a>
+          <a href="#policy">정책</a>
           <a href="./index.html">메인 문서</a>
         </nav>
       </header>
@@ -43,23 +43,22 @@
         <section class="report-hero compact-hero">
           <div class="hero-copy">
             <p class="eyebrow">Manual</p>
-            <h1>처음 보는 사람도 바로 따라할 수 있는 운영 가이드</h1>
+            <h1>입력, 분석, 해석까지 바로 보는 운영 매뉴얼</h1>
             <p class="copy">
-              이 문서는 BloManagent를 실제로 사용할 때 필요한 입력 방식, 등급 구조, 신호별 근거 해석, 티스토리 검증 규칙,
-              정책 범위를 한 번에 정리한 운영 문서입니다.
+              입력 방식, 등급 구조, 신호별 근거, 티스토리 검증 규칙, 정책 범위를 한 번에 정리했습니다.
             </p>
           </div>
 
           <aside class="hero-side">
             <article class="side-card">
               <span class="side-label">Quick Rule</span>
-              <strong>수집은 공개 범위만</strong>
-              <p>로그인이 필요한 영역, 비공개 글, 관리자 통계는 수집하지 않습니다.</p>
+              <strong>공개 범위만 수집</strong>
+              <p>비공개 글과 관리자 통계는 수집하지 않습니다.</p>
             </article>
             <article class="side-card">
               <span class="side-label">Scoring Rule</span>
               <strong>점수는 algorithm 고정</strong>
-              <p>AI 엔진은 설명 문장 보강만 담당하며, 등급 계산은 바꾸지 않습니다.</p>
+              <p>AI 엔진은 설명 문장만 보강합니다.</p>
             </article>
           </aside>
         </section>
@@ -74,31 +73,31 @@
             <article class="stage-card">
               <span class="stage-index">01</span>
               <h3>주소 입력</h3>
-              <p>블로그 메인 URL 또는 게시글 URL을 입력합니다. 게시글 URL은 가능한 범위에서 블로그 기준으로 정규화합니다.</p>
+              <p>블로그 메인 URL 또는 게시글 URL을 입력합니다.</p>
             </article>
             <article class="stage-card">
               <span class="stage-index">02</span>
               <h3>수집 실행</h3>
-              <p>RSS, sitemap, wp-json, HTML을 사용해 공개 게시글 후보를 모으고 verified 또는 excluded로 나눕니다.</p>
+              <p>RSS, sitemap, wp-json, HTML로 후보를 모으고 verified와 excluded로 나눕니다.</p>
             </article>
             <article class="stage-card">
               <span class="stage-index">03</span>
               <h3>분석 실행</h3>
-              <p>게시글별 등급, 신호, 근거, 개선 작업을 생성하고 최신 리포트 스냅샷을 만듭니다.</p>
+              <p>게시글별 등급, 근거, 개선 작업을 생성합니다.</p>
             </article>
             <article class="stage-card">
               <span class="stage-index">04</span>
               <h3>초기화</h3>
-              <p>작업이 끝나면 워크스페이스를 비워 다음 분석을 새 상태에서 시작할 수 있습니다.</p>
+              <p>작업이 끝나면 워크스페이스를 비웁니다.</p>
             </article>
           </div>
         </section>
 
         <section class="report-section" id="grade">
           <div class="section-head">
-            <p class="eyebrow">Grade System</p>
-            <h2>등급은 S~F, 계산은 qualityScore 기반</h2>
-            <p>화면은 등급 중심으로 보여주지만 내부에서는 qualityScore를 계산하고 그 결과를 S~F로 변환합니다.</p>
+            <p class="eyebrow">Grade</p>
+            <h2>S~F 등급 구조</h2>
+            <p>화면은 등급 중심으로 보여주고 내부에서는 qualityScore를 계산합니다.</p>
           </div>
 
           <div class="two-column">
@@ -106,7 +105,7 @@
               <h3>상위 축</h3>
               <ul class="list-block">
                 <li>headline: 제목과 첫인상</li>
-                <li>readability: 문단, 소제목, 목록, 스캔성</li>
+                <li>readability: 문단, 목록, 스캔성</li>
                 <li>value: 예시, 체크리스트, 실행 순서</li>
                 <li>originality: 경험, 비교, 차별 포인트</li>
                 <li>search fit: 질문형 구조, FAQ, 키워드 정렬</li>
@@ -129,59 +128,59 @@
         <section class="report-section" id="evidence">
           <div class="section-head">
             <p class="eyebrow">Evidence</p>
-            <h2>왜 낮은지 수치와 근거를 같이 보여줍니다</h2>
+            <h2>왜 낮은지 같이 보여줍니다</h2>
           </div>
 
           <div class="three-column">
             <article class="table-card">
               <h3>약한 신호</h3>
-              <p>예시 커버리지, FAQ 커버리지, 경험 신호처럼 부족한 축을 등급과 함께 노출합니다.</p>
+              <p>부족한 축을 등급과 함께 노출합니다.</p>
             </article>
             <article class="table-card">
               <h3>근거</h3>
-              <p>질문형 문장 수, 예시 표현 미검출, 직접 경험 표현 미검출 같은 근거를 함께 보여줍니다.</p>
+              <p>질문형 문장 수, 예시 표현 미검출 같은 근거를 함께 보여줍니다.</p>
             </article>
             <article class="table-card">
               <h3>개선 작업</h3>
-              <p>약한 신호 조합에 맞춰 글 내용 기반 액션을 생성해 리포트 카드에 연결합니다.</p>
+              <p>약한 신호 조합에 맞춰 글 내용 기반 액션을 생성합니다.</p>
             </article>
           </div>
         </section>
 
         <section class="report-section" id="tistory">
           <div class="section-head">
-            <p class="eyebrow">Tistory Rule</p>
-            <h2>티스토리 오탐을 막는 검증 규칙</h2>
+            <p class="eyebrow">Tistory</p>
+            <h2>티스토리 검증 규칙</h2>
           </div>
 
           <div class="stage-grid">
             <article class="stage-card">
               <span class="stage-index">Gate 1</span>
               <h3>URL 규칙</h3>
-              <p><code>/{숫자}</code>, <code>/entry/...</code>만 통과시키고 category, tag, archive, guestbook은 제외합니다.</p>
+              <p><code>/{숫자}</code>, <code>/entry/...</code>만 통과시키고 나머지는 제외합니다.</p>
             </article>
             <article class="stage-card">
               <span class="stage-index">Gate 2</span>
               <h3>실제 페이지 확인</h3>
-              <p>후보 URL을 다시 fetch한 뒤 article marker가 있는지 확인합니다.</p>
+              <p>후보 URL을 다시 fetch해 article marker를 확인합니다.</p>
             </article>
             <article class="stage-card">
               <span class="stage-index">Gate 3</span>
-              <h3>verified / excluded 분리</h3>
-              <p>애매한 URL은 삭제하지 않고 excluded로 보관하지만, 집계와 분석에서는 제외합니다.</p>
+              <h3>verified / excluded</h3>
+              <p>애매한 URL은 excluded로 보관하고 집계에서는 제외합니다.</p>
             </article>
             <article class="stage-card">
               <span class="stage-index">Case</span>
               <h3>storybeing 기준</h3>
-              <p>현재 기준 verified posts 14개, `rss 10 / sitemap 4 / main 0 / wp-json 0`입니다.</p>
+              <p>현재 기준 verified posts 14개, `rss 10 / sitemap 4 / main 0`입니다.</p>
             </article>
           </div>
         </section>
 
         <section class="report-section" id="policy">
           <div class="section-head">
-            <p class="eyebrow">Policy Scope</p>
-            <h2>정책 범위와 제한</h2>
+            <p class="eyebrow">Policy</p>
+            <h2>정책 범위</h2>
           </div>
 
           <article class="table-card">
@@ -197,7 +196,7 @@
                 <tr>
                   <td>비공개 글</td>
                   <td><span class="status-chip risk">수집 안 함</span></td>
-                  <td>로그인, 쿠키, 권한이 필요한 영역은 다루지 않습니다.</td>
+                  <td>로그인과 권한이 필요한 영역은 다루지 않습니다.</td>
                 </tr>
                 <tr>
                   <td>관리자 통계</td>
@@ -207,12 +206,12 @@
                 <tr>
                   <td>Naver Blog</td>
                   <td><span class="status-chip watch">기본 비활성</span></td>
-                  <td>정책 리스크 때문에 opt-in이 없으면 차단합니다.</td>
+                  <td>opt-in이 없으면 차단합니다.</td>
                 </tr>
                 <tr>
                   <td>AI 엔진</td>
                   <td><span class="status-chip neutral">선택 사항</span></td>
-                  <td>Ollama, OpenAI, Google은 서술 보강만 담당합니다.</td>
+                  <td>서술 보강만 담당합니다.</td>
                 </tr>
               </tbody>
             </table>
@@ -222,7 +221,7 @@
         <section class="report-section">
           <div class="section-head">
             <p class="eyebrow">Recovery</p>
-            <h2>다음 세션 복구 기준</h2>
+            <h2>복구 기준</h2>
           </div>
 
           <div class="three-column">
@@ -232,11 +231,11 @@
             </article>
             <article class="table-card">
               <h3>2. wiki</h3>
-              <p>운영 원칙과 아키텍처, 노션 시리즈 링크를 wiki에서 확인합니다.</p>
+              <p>운영 원칙과 아키텍처를 wiki에서 확인합니다.</p>
             </article>
             <article class="table-card">
               <h3>3. Step 원고</h3>
-              <p><code>docs/notion/BloManagent</code>와 노션 Step 페이지를 기준으로 글 자산을 이어갑니다.</p>
+              <p><code>docs/notion/BloManagent</code>와 노션 Step을 기준으로 이어갑니다.</p>
             </article>
           </div>
         </section>
