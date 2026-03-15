@@ -6,7 +6,7 @@ import { blogs, postEngagementSnapshots, posts } from "../db/schema";
 import { discoverPosts, getAdapter, resolvePlatform } from "../platforms";
 import { createId, normalizeUrl, nowIso, safeJsonParse, sha256, toBoolean } from "../lib/utils";
 import { resolveNaverBlogId } from "../platforms/naver";
-import { topIssuesFromAnalysis } from "./heuristics";
+import { buildExplainabilityDetails, topIssuesFromAnalysis } from "./heuristics";
 import { getAppSettings } from "./settings-service";
 
 const NAVER_POLICY_MESSAGE =
@@ -911,6 +911,24 @@ export const getBlogDetail = async (id: string) => {
   const mappedPosts = postRows
     .map((row) => {
       const quality = scoreSnapshotFromRow(row);
+      const signalBreakdown = safeJsonParse(row.latest_signal_breakdown as string | null, null as Record<string, number> | null);
+      const contentMetrics = safeJsonParse(row.latest_content_metrics as string | null, null);
+      const explainability =
+        quality && signalBreakdown && contentMetrics
+          ? buildExplainabilityDetails({
+              postTitle: String(row.title ?? row.url),
+              contentText: String(row.content_clean ?? ""),
+              signalBreakdown: signalBreakdown as any,
+              contentMetrics: contentMetrics as any,
+              scores: {
+                headlineScore: quality.headlineScore,
+                readabilityScore: quality.readabilityScore,
+                valueScore: quality.valueScore,
+                originalityScore: quality.originalityScore,
+                searchFitScore: quality.searchFitScore,
+              },
+            })
+          : null;
       return {
         id: String(row.id),
         title: String(row.title ?? row.url),
@@ -921,13 +939,15 @@ export const getBlogDetail = async (id: string) => {
         summary: (row.latest_summary as string | null) ?? null,
         topicLabels: safeJsonParse(row.latest_topics as string | null, [] as string[]),
         strengths: safeJsonParse(row.latest_strengths as string | null, [] as string[]),
-        weaknesses: safeJsonParse(row.latest_weaknesses as string | null, [] as string[]),
-        improvements: safeJsonParse(row.latest_improvements as string | null, [] as string[]),
+        weaknesses: explainability?.weaknesses ?? safeJsonParse(row.latest_weaknesses as string | null, [] as string[]),
+        improvements: explainability?.improvements ?? safeJsonParse(row.latest_improvements as string | null, [] as string[]),
         topScoreDrivers: safeJsonParse(row.latest_drivers as string | null, [] as string[]),
         topScoreRisks: safeJsonParse(row.latest_risks as string | null, [] as string[]),
         weakSignals: safeJsonParse(row.latest_risks as string | null, [] as string[]).slice(0, 3),
-        signalBreakdown: safeJsonParse(row.latest_signal_breakdown as string | null, {}),
-        contentMetrics: safeJsonParse(row.latest_content_metrics as string | null, null),
+        signalBreakdown,
+        contentMetrics,
+        signalFindings: explainability?.signalFindings ?? [],
+        improvementItems: explainability?.improvementItems ?? [],
         updatedAt: String(row.updated_at),
         qualityScore: quality?.qualityScore ?? null,
         qualityStatus: quality?.qualityStatus ?? null,

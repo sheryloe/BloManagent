@@ -73,7 +73,7 @@ textarea {
 button {
   border: 0;
   border-radius: 14px;
-  padding: 0.92rem 1.12rem;
+  padding: 0.78rem 0.98rem;
   color: var(--text);
   background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
   font-weight: 700;
@@ -102,7 +102,7 @@ textarea {
   width: 100%;
   border: 1px solid var(--line);
   border-radius: 14px;
-  padding: 0.92rem 1rem;
+  padding: 0.74rem 0.86rem;
   background: rgba(6, 13, 28, 0.85);
   color: var(--text);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
@@ -131,7 +131,7 @@ label {
 
 .app-shell {
   display: grid;
-  grid-template-columns: 310px minmax(0, 1fr);
+  grid-template-columns: 286px minmax(0, 1fr);
   min-height: 100vh;
 }
 
@@ -141,8 +141,8 @@ label {
   align-self: start;
   height: 100vh;
   display: grid;
-  gap: 1.35rem;
-  padding: 1.3rem;
+  gap: 1rem;
+  padding: 1rem;
   background:
     linear-gradient(180deg, rgba(4, 10, 24, 0.98), rgba(10, 21, 46, 0.98)),
     radial-gradient(circle at top right, rgba(86, 212, 255, 0.15), transparent 36%);
@@ -161,7 +161,7 @@ label {
 .sidebar-brand,
 .sidebar-section {
   border-radius: var(--radius-lg);
-  padding: 1rem;
+  padding: 0.88rem;
 }
 
 .sidebar-brand {
@@ -248,12 +248,12 @@ label {
 
 .note-grid {
   display: grid;
-  gap: 0.9rem;
-  margin-top: 0.8rem;
+  gap: 0.7rem;
+  margin-top: 0.65rem;
 }
 
 .note-grid article {
-  padding: 0.9rem;
+  padding: 0.72rem;
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(129, 166, 255, 0.08);
@@ -270,15 +270,15 @@ label {
 
 .app-main {
   min-width: 0;
-  padding: 1.3rem 1.3rem 2rem;
+  padding: 1rem 1rem 1.4rem;
 }
 
 .app-header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 1.2rem;
-  padding: 1.2rem 1.25rem;
+  gap: 0.85rem;
+  padding: 0.95rem 1rem;
   border: 1px solid var(--line);
   border-radius: var(--radius-xl);
   background: linear-gradient(180deg, rgba(8, 17, 36, 0.8), rgba(11, 22, 46, 0.92));
@@ -286,8 +286,8 @@ label {
 }
 
 .app-header h2 {
-  margin: 0.38rem 0 0.5rem;
-  font: 700 clamp(1.8rem, 3vw, 2.6rem) / 1.02 "Space Grotesk", "IBM Plex Sans KR", sans-serif;
+  margin: 0.24rem 0 0.35rem;
+  font: 700 clamp(1.55rem, 2.5vw, 2.2rem) / 1.02 "Space Grotesk", "IBM Plex Sans KR", sans-serif;
   letter-spacing: -0.05em;
 }
 
@@ -322,12 +322,12 @@ label {
 }
 
 .app-content {
-  margin-top: 1.2rem;
+  margin-top: 0.9rem;
 }
 
 .page {
   display: grid;
-  gap: 1rem;
+  gap: 0.8rem;
 }
 
 .hero,
@@ -352,13 +352,13 @@ label {
   display: flex;
   justify-content: space-between;
   align-items: stretch;
-  gap: 1rem;
-  padding: 1.25rem;
+  gap: 0.8rem;
+  padding: 1rem;
 }
 
 .hero h2 {
-  margin: 0.35rem 0 0.55rem;
-  font: 700 clamp(1.65rem, 2.4vw, 2.3rem) / 1.03 "Space Grotesk", "IBM Plex Sans KR", sans-serif;
+  margin: 0.24rem 0 0.35rem;
+  font: 700 clamp(1.45rem, 2vw, 2rem) / 1.04 "Space Grotesk", "IBM Plex Sans KR", sans-serif;
   letter-spacing: -0.05em;
 }
 
@@ -374,13 +374,13 @@ label {
 .detail-metrics-grid,
 .report-layout {
   display: grid;
-  gap: 0.9rem;
+  gap: 0.7rem;
 }
 
 .hero-stats,
 .dashboard-stats {
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  min-width: min(420px, 100%);
+  min-width: min(360px, 100%);
 }
 
 .dashboard-hero {
@@ -401,8 +401,8 @@ label {
 .metric-card {
   display: grid;
   gap: 0.3rem;
-  padding: 1rem;
-  border-radius: 18px;
+  padding: 0.82rem;
+  border-radius: 15px;
   border: 1px solid rgba(129, 166, 255, 0.16);
   background:
     linear-gradient(180deg, rgba(17, 33, 66, 0.94), rgba(11, 23, 47, 0.94)),
@@ -416,11 +416,11 @@ label {
 }
 
 .metric-card strong {
-  font: 700 clamp(1.6rem, 2vw, 2rem) / 1 "Space Grotesk", "IBM Plex Sans KR", sans-serif;
+  font: 700 clamp(1.35rem, 1.7vw, 1.72rem) / 1 "Space Grotesk", "IBM Plex Sans KR", sans-serif;
 }
 
 .panel {
-  padding: 1.05rem;
+  padding: 0.9rem;
 }
 
 .section-header {
@@ -429,20 +429,20 @@ label {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
-  margin-bottom: 0.95rem;
+  gap: 0.7rem;
+  margin-bottom: 0.7rem;
 }
 
 .section-header h3 {
   margin: 0;
-  font: 700 1.02rem/1.2 "Space Grotesk", "IBM Plex Sans KR", sans-serif;
+  font: 700 0.95rem/1.15 "Space Grotesk", "IBM Plex Sans KR", sans-serif;
   letter-spacing: -0.03em;
 }
 
 .card-list,
 .stack-list {
   display: grid;
-  gap: 0.85rem;
+  gap: 0.65rem;
 }
 
 .stack-item,
@@ -452,8 +452,8 @@ label {
 .action-box,
 .report-list-item,
 .advanced-panel {
-  padding: 0.95rem;
-  border-radius: 16px;
+  padding: 0.78rem;
+  border-radius: 13px;
   border: 1px solid rgba(129, 166, 255, 0.14);
   background: linear-gradient(180deg, rgba(16, 30, 58, 0.92), rgba(11, 22, 44, 0.88));
 }
@@ -465,7 +465,7 @@ label {
 }
 
 .summary-card strong {
-  font: 700 1.4rem/1 "Space Grotesk", "IBM Plex Sans KR", sans-serif;
+  font: 700 1.18rem/1 "Space Grotesk", "IBM Plex Sans KR", sans-serif;
 }
 
 .log-row {
@@ -534,12 +534,12 @@ label {
 
 .score-band-list {
   display: grid;
-  gap: 0.75rem;
+  gap: 0.55rem;
 }
 
 .score-band-row {
   display: grid;
-  gap: 0.45rem;
+  gap: 0.3rem;
 }
 
 .bar-track {
@@ -609,12 +609,12 @@ label {
 
 .form-panel {
   display: grid;
-  gap: 0.95rem;
+  gap: 0.75rem;
 }
 
 .advanced-panel {
   display: grid;
-  gap: 0.7rem;
+  gap: 0.5rem;
 }
 
 .workspace-reset {
@@ -639,7 +639,171 @@ label {
 
 .provider-block {
   display: grid;
-  gap: 0.9rem;
+  gap: 0.7rem;
+}
+
+.compact-page {
+  gap: 0.75rem;
+}
+
+.compact-hero .muted,
+.compact-panel .muted,
+.compact-card .muted {
+  line-height: 1.45;
+}
+
+.compact-metric-grid {
+  min-width: min(340px, 100%);
+}
+
+.compact-metric {
+  min-height: 92px;
+}
+
+.compact-panel {
+  padding: 0.82rem;
+}
+
+.compact-section-header {
+  margin-bottom: 0.55rem;
+}
+
+.compact-summary-grid {
+  gap: 0.6rem;
+}
+
+.compact-card {
+  padding: 0.72rem;
+}
+
+.compact-stack {
+  gap: 0.55rem;
+}
+
+.compact-summary {
+  margin: 0;
+  color: #d9e3ff;
+  line-height: 1.48;
+}
+
+.dense-pills {
+  gap: 0.4rem;
+}
+
+.dense-pills .pill,
+.dense-pills .status-pill {
+  min-height: 28px;
+  padding: 0 0.68rem;
+  font-size: 0.76rem;
+}
+
+.compact-post-card {
+  padding: 0.85rem;
+  gap: 0.7rem;
+}
+
+.compact-post-head {
+  align-items: flex-start;
+}
+
+.post-card-grid {
+  display: grid;
+  grid-template-columns: 1.05fr 1.15fr 0.9fr;
+  gap: 0.65rem;
+}
+
+.compact-block {
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.7rem;
+  border: 1px solid rgba(129, 166, 255, 0.14);
+  border-radius: 12px;
+  background: rgba(8, 18, 37, 0.46);
+}
+
+.compact-block-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.finding-list {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.finding-row {
+  display: grid;
+  gap: 0.4rem;
+  padding-bottom: 0.45rem;
+  border-bottom: 1px solid rgba(129, 166, 255, 0.08);
+}
+
+.finding-row:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.finding-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.45rem;
+}
+
+.finding-head strong {
+  line-height: 1.35;
+}
+
+.evidence-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.evidence-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(129, 166, 255, 0.12);
+  color: #cfd9f6;
+  font-size: 0.74rem;
+  line-height: 1.25;
+}
+
+.compact-reason {
+  margin: 0;
+}
+
+.compact-list {
+  display: grid;
+  gap: 0.28rem;
+  margin: 0;
+  padding-left: 1rem;
+  color: #dbe4ff;
+}
+
+.compact-list li {
+  line-height: 1.4;
+}
+
+.compact-detail-metrics {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.compact-detail-metrics .summary-card {
+  min-height: 78px;
+}
+
+.settings-provider-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
 }
 
 .error {
@@ -724,6 +888,11 @@ label {
     display: grid;
   }
 
+  .post-card-grid,
+  .settings-provider-grid {
+    grid-template-columns: 1fr;
+  }
+
   .header-pills {
     justify-content: flex-start;
   }
@@ -740,11 +909,11 @@ label {
   .app-header,
   .sidebar-brand,
   .sidebar-section {
-    border-radius: 18px;
+    border-radius: 16px;
   }
 
   .metric-card strong {
-    font-size: 1.5rem;
+    font-size: 1.32rem;
   }
 
   .button-row button,

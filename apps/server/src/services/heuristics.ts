@@ -2,9 +2,11 @@ import { load } from "cheerio";
 import type {
   AnalysisSummary,
   ContentMetrics,
+  ImprovementItem,
   PostAnalysis,
   PostNarrative,
   Recommendation,
+  SignalFinding,
   SignalBreakdown,
 } from "@blog-review/shared";
 import { qualityGrade, qualityStatus } from "@blog-review/shared";
@@ -76,6 +78,11 @@ const averageRounded = (values: number[]) => Math.round(average(values));
 const weightedScore = (entries: Array<[number, number]>) =>
   clampScore(entries.reduce((sum, [score, weight]) => sum + score * weight, 0));
 const gradeText = (score: number) => `${qualityGrade(score)} grade`;
+const trimSnippet = (value: string, max = 88) => {
+  const text = cleanText(value);
+  if (text.length <= max) return text;
+  return `${text.slice(0, max).trimEnd()}...`;
+};
 
 const scoreFromIdeal = (
   value: number,
@@ -192,6 +199,8 @@ const areaAction = (area: QualityArea) => {
   }
 };
 
+const isPenaltySignal = (key: keyof SignalBreakdown) => key === "genericTitlePenalty" || key === "redundancyPenalty";
+
 const signalDefinitions: Record<keyof SignalBreakdown, { label: string; area: QualityArea }> = {
   titleLengthFit: { label: "제목 길이 적합도", area: "headline" },
   titleSpecificity: { label: "제목 구체성", area: "headline" },
@@ -226,6 +235,264 @@ const buildSignalList = (signals: SignalBreakdown): NamedSignal[] =>
     label: signalDefinitions[key as keyof SignalBreakdown].label,
     area: signalDefinitions[key as keyof SignalBreakdown].area,
   }));
+
+const buildEvidenceSnippets = (contentText: string, pattern: RegExp, limit = 2) =>
+  buildSentences(contentText)
+    .filter((sentence) => pattern.test(sentence))
+    .slice(0, limit)
+    .map((sentence) => `"${trimSnippet(sentence, 74)}"`);
+
+const buildSignalEvidence = (
+  signal: NamedSignal,
+  input: Pick<AnalyzePostInput, "postTitle">,
+  contentText: string,
+  metrics: ContentMetrics,
+) => {
+  const titleLength = cleanText(input.postTitle).length;
+  const titleTokens = tokenize(input.postTitle);
+  const overlap = Math.round(metrics.titleBodyOverlapRatio * 100);
+  const topicOverlap = Math.round(metrics.siblingTopicOverlapRatio * 100);
+  const exampleSnippets = buildEvidenceSnippets(contentText, /예를 들어|예시|사례|케이스|sample|case|before|after/i);
+  const experienceSnippets = buildEvidenceSnippets(contentText, /직접|경험|테스트|써보니|비교해보니|사용해보니/i);
+  const faqSnippets = buildEvidenceSnippets(contentText, /faq|자주 묻는 질문|질문\s*\d|q\./i);
+
+  switch (signal.key) {
+    case "titleLengthFit":
+      return [`제목 길이 ${titleLength}자`, titleLength < 18 ? "제목이 짧아 대상과 결과가 덜 보입니다." : "제목 길이는 적정 범위에 가깝습니다."];
+    case "titleSpecificity":
+      return [`제목 고유 토큰 ${new Set(titleTokens).size}개`, /\d/.test(input.postTitle) ? "숫자나 범위 표현이 있습니다." : "숫자·범위 표현이 없습니다."];
+    case "titleIntentMarker":
+      return [intentMarkers.test(input.postTitle) ? "방법·비교·정리 같은 의도 표식이 제목에 있습니다." : "방법·비교·정리 같은 의도 표식이 제목에 없습니다."];
+    case "hookPreview":
+      return [`첫 문단 길이 ${metrics.avgParagraphLength || cleanText(contentText.slice(0, 180)).length}자`, /\?|문제|결론|핵심|비교|방법/i.test(contentText.slice(0, 180)) ? "첫 문단에 문제나 방향 제시가 있습니다." : "첫 문단에서 문제·대상·결과 선언이 약합니다."];
+    case "titleBodyAlignment":
+    case "keywordAlignment":
+      return [`제목-본문 겹침 ${overlap}%`, overlap < 35 ? "제목 핵심어가 본문 초반과 소제목에서 덜 반복됩니다." : "제목 핵심어가 본문에 어느 정도 반영됩니다."];
+    case "genericTitlePenalty":
+      return [`중복 제목 ${metrics.duplicateTitleCount}개`, titleTokens.length <= 2 ? "제목 토큰 수가 적어 일반적인 인상이 강합니다." : "제목 토큰 수는 충분한 편입니다."];
+    case "paragraphBalance":
+      return [`문단 ${metrics.paragraphCount}개`, `문단 평균 길이 ${metrics.avgParagraphLength}자`];
+    case "headingCoverage":
+      return [`소제목 ${metrics.headingCount}개`, metrics.headingCount === 0 ? "소제목이 없어 스캔이 어렵습니다." : "소제목이 있어 흐름이 구분됩니다."];
+    case "listCoverage":
+      return [`목록 ${metrics.listCount}개`, `체크리스트·단계 표식 ${metrics.stepMarkerCount}개`];
+    case "sentencePace":
+      return [`문장 ${metrics.sentenceCount}개`, `본문 ${metrics.contentLength}자`];
+    case "scanability":
+      return [`소제목 ${metrics.headingCount}개`, `목록 ${metrics.listCount}개 / 질문 ${metrics.questionCount}개`];
+    case "concreteDetailDensity":
+      return [`숫자·날짜 토큰 ${metrics.numericTokenCount}개`, `출처·링크 ${metrics.referenceCount}개`];
+    case "actionability":
+      return [`체크리스트·단계 표식 ${metrics.stepMarkerCount}개`, metrics.stepMarkerCount === 0 ? "실행 순서를 바로 따라갈 구조가 약합니다." : "실행 단계가 보입니다."];
+    case "exampleCoverage":
+      return exampleSnippets.length ? exampleSnippets : ["`예를 들어`, `예시`, `사례` 패턴이 감지되지 않았습니다."];
+    case "referenceCoverage":
+      return [`출처·링크 ${metrics.referenceCount}개`, metrics.referenceCount === 0 ? "근거 링크나 출처 표시가 없습니다." : "근거 링크가 포함되어 있습니다."];
+    case "completeness":
+      return [`본문 ${metrics.contentLength}자`, `문단 ${metrics.paragraphCount}개`];
+    case "lexicalVariety":
+      return [`고유 토큰 비율 ${Math.round(metrics.uniqueTokenRatio * 100)}%`];
+    case "experienceSignal":
+      return experienceSnippets.length ? experienceSnippets : ["`직접`, `경험`, `테스트`, `써보니` 패턴이 감지되지 않았습니다."];
+    case "siblingUniqueness":
+      return [`중복 제목 ${metrics.duplicateTitleCount}개`, `형제 글 주제 겹침 ${topicOverlap}%`];
+    case "redundancyPenalty":
+      return [`중복 제목 ${metrics.duplicateTitleCount}개`, `형제 글 주제 겹침 ${topicOverlap}%`];
+    case "titleIntentMatch":
+      return [`추정 의도 ${detectIntent(input.postTitle, contentText)}`, `질문 ${metrics.questionCount}개 / FAQ ${metrics.faqCount}개`];
+    case "faqCoverage":
+      return faqSnippets.length ? faqSnippets : [`FAQ ${metrics.faqCount}개`, `질문형 문장 ${metrics.questionCount}개`];
+    case "longTailSpecificity":
+      return [`제목 고유 토큰 ${new Set(titleTokens).size}개`, /\d/.test(input.postTitle) ? "제목에 숫자나 범위 표현이 있습니다." : "제목에 숫자·범위·대상 표현이 약합니다."];
+    default:
+      return [];
+  }
+};
+
+type ExplainabilityInput = {
+  postTitle: string;
+  contentText: string;
+  signalBreakdown: SignalBreakdown;
+  contentMetrics: ContentMetrics;
+  scores: Pick<PostAnalysis, "headlineScore" | "readabilityScore" | "valueScore" | "originalityScore" | "searchFitScore">;
+};
+
+const buildSignalFindings = (input: ExplainabilityInput): SignalFinding[] =>
+  buildSignalList(input.signalBreakdown)
+    .map((signal) => {
+      const normalizedScore = isPenaltySignal(signal.key) ? clampScore(100 - signal.score) : signal.score;
+      return {
+        key: signal.key,
+        label: signal.label,
+        area: signal.area,
+        score: normalizedScore,
+        qualityGrade: qualityGrade(normalizedScore),
+        evidence: buildSignalEvidence(signal, { postTitle: input.postTitle }, input.contentText, input.contentMetrics).slice(0, 4),
+      };
+    })
+    .sort((left, right) => left.score - right.score);
+
+const buildImprovementItem = (
+  area: QualityArea,
+  score: number,
+  findings: SignalFinding[],
+  metrics: ContentMetrics,
+  postTitle: string,
+) => {
+  const byKey = (key: string) => findings.find((item) => item.key === key);
+  if (area === "headline") {
+    const titleIssue = byKey("titleSpecificity");
+    const hookIssue = byKey("hookPreview");
+    const genericIssue = byKey("genericTitlePenalty");
+    const primary = [titleIssue, hookIssue, genericIssue].filter(Boolean).sort((left, right) => (left?.score ?? 100) - (right?.score ?? 100))[0];
+    return {
+      area,
+      title: primary?.key === "hookPreview" ? "첫 문단에서 문제와 결과를 먼저 선언하세요." : "제목에 대상과 결과를 더 분명히 넣으세요.",
+      score,
+      qualityGrade: qualityGrade(score),
+      reason:
+        primary?.key === "genericTitlePenalty"
+          ? `비슷한 제목이 ${metrics.duplicateTitleCount}개 보여 일반적인 인상이 강합니다.`
+          : primary?.key === "hookPreview"
+            ? "첫 문단에서 글의 문제와 기대 결과가 바로 보이지 않습니다."
+            : "제목이 짧거나 범위 표현이 약해 클릭 이유가 덜 선명합니다.",
+      evidence: primary?.evidence ?? [],
+      actions: [
+        /\d/.test(postTitle) ? "제목에 대상·상황·결과 순서를 더 분명히 배치하세요." : "제목에 대상, 조건, 결과 중 최소 2개를 넣어 다시 써보세요.",
+        "첫 두 문장 안에 이 글이 해결하는 문제와 얻는 결과를 적으세요.",
+      ],
+    } satisfies ImprovementItem;
+  }
+
+  if (area === "readability") {
+    const headingIssue = byKey("headingCoverage");
+    const listIssue = byKey("listCoverage");
+    const paragraphIssue = byKey("paragraphBalance");
+    const primary = [headingIssue, listIssue, paragraphIssue].filter(Boolean).sort((left, right) => (left?.score ?? 100) - (right?.score ?? 100))[0];
+    return {
+      area,
+      title: primary?.key === "headingCoverage" ? "본문을 소제목 기준으로 다시 쪼개세요." : "긴 문단을 나누고 목록 구조를 추가하세요.",
+      score,
+      qualityGrade: qualityGrade(score),
+      reason:
+        primary?.key === "headingCoverage"
+          ? `소제목이 ${metrics.headingCount}개라서 스캔 포인트가 부족합니다.`
+          : primary?.key === "listCoverage"
+            ? `목록 ${metrics.listCount}개, 단계 표식 ${metrics.stepMarkerCount}개로 따라가기 구조가 약합니다.`
+            : `문단 ${metrics.paragraphCount}개, 평균 ${metrics.avgParagraphLength}자로 문단 균형이 좋지 않습니다.`,
+      evidence: primary?.evidence ?? [],
+      actions: [
+        "핵심 구간을 3개 전후 소제목으로 나누세요.",
+        metrics.listCount === 0 ? "체크리스트나 번호 목록을 1개 이상 추가하세요." : "긴 문단을 2~3문장 단위로 분리하세요.",
+      ],
+    } satisfies ImprovementItem;
+  }
+
+  if (area === "value") {
+    const exampleIssue = byKey("exampleCoverage");
+    const actionIssue = byKey("actionability");
+    const referenceIssue = byKey("referenceCoverage");
+    const primary = [exampleIssue, actionIssue, referenceIssue].filter(Boolean).sort((left, right) => (left?.score ?? 100) - (right?.score ?? 100))[0];
+    return {
+      area,
+      title:
+        primary?.key === "exampleCoverage"
+          ? "예시 문단을 추가해 실전성을 올리세요."
+          : primary?.key === "referenceCoverage"
+            ? "근거 링크나 출처를 붙여 설득력을 보강하세요."
+            : "실행 순서와 체크리스트를 더 분명히 적으세요.",
+      score,
+      qualityGrade: qualityGrade(score),
+      reason:
+        primary?.key === "exampleCoverage"
+          ? "실제 사례가 드러나는 문장이 거의 없어 독자가 바로 적용하기 어렵습니다."
+          : primary?.key === "referenceCoverage"
+            ? `출처·링크가 ${metrics.referenceCount}개라 근거가 약합니다.`
+            : `단계 표식이 ${metrics.stepMarkerCount}개라 실행 순서가 충분히 드러나지 않습니다.`,
+      evidence: primary?.evidence ?? [],
+      actions: [
+        primary?.key === "exampleCoverage" ? "실제 사례 1개를 `예를 들어`로 시작하는 문단으로 추가하세요." : "번호 목록으로 실행 순서를 3단계 이상 적으세요.",
+        primary?.key === "referenceCoverage" ? "공식 문서나 비교 링크를 1~2개 붙이세요." : "마지막에 체크리스트 블록을 붙이세요.",
+      ],
+    } satisfies ImprovementItem;
+  }
+
+  if (area === "originality") {
+    const experienceIssue = byKey("experienceSignal");
+    const uniqueIssue = byKey("siblingUniqueness");
+    const redundancyIssue = byKey("redundancyPenalty");
+    const primary = [experienceIssue, uniqueIssue, redundancyIssue].filter(Boolean).sort((left, right) => (left?.score ?? 100) - (right?.score ?? 100))[0];
+    return {
+      area,
+      title:
+        primary?.key === "experienceSignal"
+          ? "직접 경험이나 테스트 기준을 한 단락 넣으세요."
+          : "다른 글과 다른 비교 포인트를 먼저 세우세요.",
+      score,
+      qualityGrade: qualityGrade(score),
+      reason:
+        primary?.key === "experienceSignal"
+          ? "직접 써본 기준이나 비교 결과가 드러나는 문장이 부족합니다."
+          : `비슷한 제목 ${metrics.duplicateTitleCount}개, 주제 겹침 ${Math.round(metrics.siblingTopicOverlapRatio * 100)}%로 차별점이 약합니다.`,
+      evidence: primary?.evidence ?? [],
+      actions: [
+        primary?.key === "experienceSignal" ? "직접 해본 기준, 실패 사례, 선택 이유 중 1가지를 넣으세요." : "기존 글과 다른 비교 축 하나를 제목과 소제목에 반영하세요.",
+        "결론 문단에 왜 이 글이 다른 글과 다른지 한 문장으로 적으세요.",
+      ],
+    } satisfies ImprovementItem;
+  }
+
+  const faqIssue = byKey("faqCoverage");
+  const keywordIssue = byKey("keywordAlignment");
+  const longTailIssue = byKey("longTailSpecificity");
+  const primary = [faqIssue, keywordIssue, longTailIssue].filter(Boolean).sort((left, right) => (left?.score ?? 100) - (right?.score ?? 100))[0];
+  return {
+    area,
+    title:
+      primary?.key === "faqCoverage"
+        ? "FAQ 블록과 질문형 소제목을 추가하세요."
+        : primary?.key === "longTailSpecificity"
+          ? "제목에 연도·대상·상황을 더 구체적으로 넣으세요."
+          : "제목 핵심어를 본문 초반과 소제목에 더 맞추세요.",
+    score,
+    qualityGrade: qualityGrade(score),
+    reason:
+      primary?.key === "faqCoverage"
+        ? `FAQ ${metrics.faqCount}개, 질문형 문장 ${metrics.questionCount}개로 질문 대응이 약합니다.`
+        : primary?.key === "longTailSpecificity"
+          ? "제목에 구체적 조건이나 범위 표현이 약합니다."
+          : `제목-본문 겹침이 ${Math.round(metrics.titleBodyOverlapRatio * 100)}%라 검색 의도 정렬이 약합니다.`,
+    evidence: primary?.evidence ?? [],
+    actions: [
+      primary?.key === "faqCoverage" ? "하단에 FAQ 2개 이상을 추가하세요." : "제목 핵심어를 첫 문단과 소제목에 한 번씩 다시 사용하세요.",
+      primary?.key === "longTailSpecificity" ? "연도, 대상, 조건 중 1개 이상을 제목에 넣으세요." : "질문형 소제목 1개를 추가하세요.",
+    ],
+  } satisfies ImprovementItem;
+};
+
+export const buildExplainabilityDetails = (input: ExplainabilityInput) => {
+  const signalFindings = buildSignalFindings(input);
+  const rankedAreas: Array<[QualityArea, number]> = [
+    ["headline", input.scores.headlineScore],
+    ["readability", input.scores.readabilityScore],
+    ["value", input.scores.valueScore],
+    ["originality", input.scores.originalityScore],
+    ["search-fit", input.scores.searchFitScore],
+  ].sort((left, right) => left[1] - right[1]);
+
+  const improvementItems = rankedAreas.slice(0, 3).map(([area, score]) =>
+    buildImprovementItem(area, score, signalFindings.filter((item) => item.area === area), input.contentMetrics, input.postTitle),
+  );
+
+  return {
+    signalFindings,
+    improvementItems,
+    weaknesses: improvementItems.map((item) => item.reason).slice(0, 5),
+    improvements: improvementItems
+      .map((item) => `${item.title} ${item.actions[0] ?? ""}`.trim())
+      .slice(0, 5),
+  };
+};
 
 const buildContentMetrics = (
   title: string,
@@ -532,19 +799,6 @@ const buildWeaknesses = (
   return weaknesses.slice(0, 5);
 };
 
-const buildImprovements = (
-  scores: Pick<PostAnalysis, "headlineScore" | "readabilityScore" | "valueScore" | "originalityScore" | "searchFitScore">,
-) => {
-  const ranked: Array<[QualityArea, number]> = [
-    ["headline", scores.headlineScore],
-    ["readability", scores.readabilityScore],
-    ["value", scores.valueScore],
-    ["originality", scores.originalityScore],
-    ["search-fit", scores.searchFitScore],
-  ].sort((left, right) => left[1] - right[1]);
-  return ranked.slice(0, 3).map(([area]) => areaAction(area));
-};
-
 const buildSeoNotes = (title: string, metrics: ContentMetrics, topics: string[]) => {
   const notes = [
     "핵심 키워드는 제목, 첫 문단, 소제목에 같은 표현으로 정렬하세요.",
@@ -597,6 +851,13 @@ export const heuristicPostAnalysis = (input: AnalyzePostInput): ProviderResult<P
   const topics = buildTopicLabels(input.postTitle, contentText);
   const topScoreDrivers = buildTopDrivers(signals);
   const topScoreRisks = buildTopRisks(signals);
+  const explainability = buildExplainabilityDetails({
+    postTitle: input.postTitle,
+    contentText,
+    signalBreakdown: signals,
+    contentMetrics: metrics,
+    scores,
+  });
 
   const analysis: PostAnalysis = {
     summary: buildSummary(input.postTitle, contentText, scores.qualityScore, topScoreDrivers, topScoreRisks),
@@ -604,8 +865,8 @@ export const heuristicPostAnalysis = (input: AnalyzePostInput): ProviderResult<P
     intentGuess: inferIntent(input.postTitle, contentText),
     topicLabels: topics,
     strengths: buildStrengths(scores, metrics, topScoreDrivers),
-    weaknesses: buildWeaknesses(scores, metrics),
-    improvements: buildImprovements(scores),
+    weaknesses: explainability.weaknesses.length ? explainability.weaknesses : buildWeaknesses(scores, metrics),
+    improvements: explainability.improvements,
     seoNotes: buildSeoNotes(input.postTitle, metrics, topics),
     titleStrength: clampScore((signals.titleLengthFit + signals.titleSpecificity + signals.titleIntentMarker) / 3),
     hookStrength: clampScore((signals.hookPreview + signals.titleBodyAlignment + (100 - signals.genericTitlePenalty)) / 3),
@@ -627,6 +888,8 @@ export const heuristicPostAnalysis = (input: AnalyzePostInput): ProviderResult<P
     qualityGrade: qualityGrade(scores.qualityScore),
     signalBreakdown: signals,
     contentMetrics: metrics,
+    signalFindings: explainability.signalFindings,
+    improvementItems: explainability.improvementItems,
     topScoreDrivers,
     topScoreRisks,
     engagementAdjustmentNote: buildEngagementNote(input),

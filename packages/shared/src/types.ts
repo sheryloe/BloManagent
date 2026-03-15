@@ -15,10 +15,12 @@ import type {
   postAnalysisSchema,
   postNarrativeSchema,
   postDiagnosticSchema,
+  improvementItemSchema,
   recommendationSchema,
   reportSchema,
   runDetailsSchema,
   runSchema,
+  signalFindingSchema,
   signalBreakdownSchema,
   settingsPayloadSchema,
 } from "./schemas";
@@ -33,6 +35,8 @@ export type PostAnalysis = z.infer<typeof postAnalysisSchema>;
 export type PostNarrative = z.infer<typeof postNarrativeSchema>;
 export type SignalBreakdown = z.infer<typeof signalBreakdownSchema>;
 export type ContentMetrics = z.infer<typeof contentMetricsSchema>;
+export type SignalFinding = z.infer<typeof signalFindingSchema>;
+export type ImprovementItem = z.infer<typeof improvementItemSchema>;
 export type AnalysisSummary = z.infer<typeof analysisSummarySchema>;
 export type WeeklySummary = AnalysisSummary;
 export type Recommendation = z.infer<typeof recommendationSchema>;

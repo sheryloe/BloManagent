@@ -7,6 +7,7 @@ export const analysisModeSchema = z.enum(["fast", "balanced", "deep", "budget"])
 export const runScopeSchema = z.enum(["latest7", "latest30", "newOnly", "selected", "full"]);
 export const qualityStatusSchema = z.enum(["excellent", "solid", "watch", "needs-work"]);
 export const qualityGradeSchema = z.enum(["S", "A", "B", "C", "D", "F"]);
+export const qualityAreaSchema = z.enum(["headline", "readability", "value", "originality", "search-fit"]);
 
 export const blogSchema = z.object({
   id: z.string(),
@@ -92,6 +93,25 @@ export const contentMetricsSchema = z.object({
   siblingTopicOverlapRatio: z.number().min(0).max(1),
 });
 
+export const signalFindingSchema = z.object({
+  key: z.string(),
+  label: z.string(),
+  area: qualityAreaSchema,
+  score: z.number().int().min(0).max(100),
+  qualityGrade: qualityGradeSchema,
+  evidence: z.array(z.string()).max(4),
+});
+
+export const improvementItemSchema = z.object({
+  area: qualityAreaSchema,
+  title: z.string(),
+  score: z.number().int().min(0).max(100),
+  qualityGrade: qualityGradeSchema,
+  reason: z.string(),
+  evidence: z.array(z.string()).max(4),
+  actions: z.array(z.string()).max(4),
+});
+
 export const postNarrativeSchema = z.object({
   summary: z.string(),
   targetAudienceGuess: z.string(),
@@ -123,6 +143,8 @@ export const postAnalysisSchema = postNarrativeSchema.extend({
   qualityGrade: qualityGradeSchema,
   signalBreakdown: signalBreakdownSchema,
   contentMetrics: contentMetricsSchema,
+  signalFindings: z.array(signalFindingSchema).max(24),
+  improvementItems: z.array(improvementItemSchema).max(5),
   topScoreDrivers: z.array(z.string()).max(5),
   topScoreRisks: z.array(z.string()).max(5),
 });
@@ -256,6 +278,8 @@ export const postDiagnosticSchema = z.object({
   topImprovements: z.array(z.string()).max(2),
   weakSignals: z.array(z.string()).max(3),
   contentMetrics: contentMetricsSchema,
+  signalFindings: z.array(signalFindingSchema).max(24).optional(),
+  improvementItems: z.array(improvementItemSchema).max(5).optional(),
   summary: z.string().nullable(),
 });
 

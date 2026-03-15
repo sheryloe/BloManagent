@@ -22,7 +22,8 @@ describe("heuristicPostAnalysis", () => {
       postUrl: "https://example.com/a",
       contentText:
         "SSD를 고를 때는 가격과 용량을 같이 봐야 합니다. 이 글은 SSD를 대충 정리한 글입니다. 빠르게 읽기 어렵고 예시도 거의 없습니다. 비교 기준이나 체크리스트도 부족합니다.",
-      contentHtml: "<p>SSD를 고를 때는 가격과 용량을 같이 봐야 합니다. 이 글은 SSD를 대충 정리한 글입니다. 빠르게 읽기 어렵고 예시도 거의 없습니다. 비교 기준이나 체크리스트도 부족합니다.</p>",
+      contentHtml:
+        "<p>SSD를 고를 때는 가격과 용량을 같이 봐야 합니다. 이 글은 SSD를 대충 정리한 글입니다. 빠르게 읽기 어렵고 예시도 거의 없습니다. 비교 기준이나 체크리스트도 부족합니다.</p>",
     }).data;
 
     const structuredGuide = heuristicPostAnalysis({
@@ -57,10 +58,10 @@ describe("heuristicPostAnalysis", () => {
 
     const unique = heuristicPostAnalysis({
       ...baseInput,
-      postTitle: "노트북 발열 줄이는 법 실험 후기",
+      postTitle: "노트북 발열 줄이는 팬 세팅 후기",
       postUrl: "https://example.com/d",
-      contentText: "직접 테스트한 노트북 발열 관리 방법을 정리합니다. 써멀패드와 팬 세팅 차이를 비교했습니다.",
-      contentHtml: "<h2>테스트 조건</h2><p>직접 테스트한 노트북 발열 관리 방법을 정리합니다.</p><p>써멀패드와 팬 세팅 차이를 비교했습니다.</p>",
+      contentText: "직접 테스트한 노트북 발열 관리 방법을 정리합니다. 팬 모드와 전원 세팅 차이를 비교했습니다.",
+      contentHtml: "<h2>테스트 조건</h2><p>직접 테스트한 노트북 발열 관리 방법을 정리합니다.</p><p>팬 모드와 전원 세팅 차이를 비교했습니다.</p>",
       siblingContext: {
         duplicateTitleCount: 0,
         siblingTopicOverlapRatio: 0.1,
@@ -71,5 +72,23 @@ describe("heuristicPostAnalysis", () => {
 
     expect(unique.originalityScore).toBeGreaterThan(repeated.originalityScore);
     expect(unique.qualityScore).toBeGreaterThan(repeated.qualityScore);
+  });
+
+  it("produces evidence-based findings and improvement items", () => {
+    const analysis = heuristicPostAnalysis({
+      ...baseInput,
+      postTitle: "전세 계약 체크",
+      postUrl: "https://example.com/e",
+      contentText:
+        "전세 계약 전에 확인할 내용을 정리합니다. 서류 이름만 나열하고 있고 예를 들어 설명한 부분은 없습니다. 직접 경험이나 테스트 내용도 없습니다.",
+      contentHtml:
+        "<p>전세 계약 전에 확인할 내용을 정리합니다.</p><p>서류 이름만 나열하고 있고 예를 들어 설명한 부분은 없습니다.</p><p>직접 경험이나 테스트 내용도 없습니다.</p>",
+    }).data;
+
+    expect(analysis.signalFindings.length).toBeGreaterThan(0);
+    expect(analysis.improvementItems.length).toBeGreaterThan(0);
+    expect(analysis.signalFindings.some((item) => item.label.includes("FAQ"))).toBe(true);
+    expect(analysis.signalFindings.some((item) => item.evidence.length > 0)).toBe(true);
+    expect(analysis.improvementItems.some((item) => item.actions.length > 0)).toBe(true);
   });
 });

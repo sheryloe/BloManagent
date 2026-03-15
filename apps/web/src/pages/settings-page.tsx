@@ -35,40 +35,38 @@ export function SettingsPage() {
   };
 
   return (
-    <form className="page" onSubmit={onSave}>
-      <section className="hero dashboard-hero">
+    <form className="page compact-page" onSubmit={onSave}>
+      <section className="hero dashboard-hero compact-hero">
         <div>
           <p className="eyebrow">Engine Settings</p>
-          <h2>기본 알고리즘과 선택형 AI 보강 엔진을 함께 조정하는 설정 패널</h2>
-          <p className="muted">
-            점수와 등급은 algorithm이 계산합니다. OpenAI, Google, Ollama는 필요할 때만 서술 보강용으로 붙일 수 있습니다.
-          </p>
+          <h2>분석 엔진과 수집 기본값</h2>
+          <p className="muted">등급은 algorithm이 계산합니다. AI 엔진은 요약과 설명 문장 보강용입니다.</p>
         </div>
 
-        <div className="hero-stats dashboard-stats">
-          <div className="metric-card">
+        <div className="hero-stats dashboard-stats compact-metric-grid">
+          <div className="metric-card compact-metric">
             <span>기본 엔진</span>
             <strong>{algorithmConfig?.engine ?? "algorithm"}</strong>
           </div>
-          <div className="metric-card">
+          <div className="metric-card compact-metric">
             <span>기본 모델</span>
             <strong>{algorithmConfig?.model ?? "-"}</strong>
           </div>
-          <div className="metric-card">
-            <span>AI 보강 엔진</span>
+          <div className="metric-card compact-metric">
+            <span>AI 엔진 수</span>
             <strong>{aiProviders.length}</strong>
           </div>
-          <div className="metric-card">
+          <div className="metric-card compact-metric">
             <span>네이버 수집</span>
             <strong>{data.app.allowNaverPublicCrawl ? "허용" : "차단"}</strong>
           </div>
         </div>
       </section>
 
-      <section className="grid two">
-        <div className="panel form-panel">
-          <div className="section-header">
-            <h3>기본 분석 설정</h3>
+      <section className="grid two compact-grid">
+        <div className="panel form-panel compact-panel">
+          <div className="section-header compact-section-header">
+            <h3>기본 분석</h3>
           </div>
 
           <label>
@@ -79,7 +77,7 @@ export function SettingsPage() {
             >
               <option value="latest7">최근 7개</option>
               <option value="latest30">최근 30개</option>
-              <option value="newOnly">새 글 또는 변경 글만</option>
+              <option value="newOnly">새 글 / 변경 글만</option>
               <option value="full">가능한 전체</option>
             </select>
           </label>
@@ -94,7 +92,7 @@ export function SettingsPage() {
           </label>
 
           <label className="checkbox-row">
-            <span>참여 지표 스냅샷 수집</span>
+            <span>참여 지표 스냅샷 저장</span>
             <input
               checked={data.app.collectEngagementSnapshots}
               type="checkbox"
@@ -116,17 +114,14 @@ export function SettingsPage() {
           </label>
 
           <div className="advanced-panel">
-            <strong>기본 운영 원칙</strong>
-            <p className="muted">
-              알고리즘이 등급을 계산하고, 선택한 범위 전체 게시글을 기본으로 분석합니다. 네이버는 정책 리스크 때문에 기본 비활성화
-              상태를 권장합니다.
-            </p>
+            <strong>메모</strong>
+            <p className="muted">네이버는 정책 리스크 때문에 기본 차단 상태를 권장합니다.</p>
           </div>
         </div>
 
-        <div className="panel form-panel">
-          <div className="section-header">
-            <h3>예산 및 보강 정책</h3>
+        <div className="panel form-panel compact-panel">
+          <div className="section-header compact-section-header">
+            <h3>예산 / 보강</h3>
           </div>
 
           <label>
@@ -149,10 +144,6 @@ export function SettingsPage() {
               }
             />
           </label>
-
-          <p className="muted">
-            점수는 algorithm이 고정 계산합니다. 아래 AI 엔진은 요약 문장과 표현 보강 용도로만 사용됩니다.
-          </p>
 
           <label>
             Google API Key
@@ -185,20 +176,18 @@ export function SettingsPage() {
             />
           </label>
 
-          <p className="muted">
-            비밀 저장소: {data.secretStatus.mode === "os-keychain" ? "OS Keychain" : "환경 변수 fallback"}
-          </p>
+          <p className="muted">비밀 저장소: {data.secretStatus.mode === "os-keychain" ? "OS Keychain" : "환경 변수 fallback"}</p>
         </div>
       </section>
 
-      <section className="panel">
-        <div className="section-header">
-          <h3>선택형 AI 엔진 세부 설정</h3>
+      <section className="panel compact-panel">
+        <div className="section-header compact-section-header">
+          <h3>AI 엔진 상세</h3>
         </div>
 
-        <div className="card-list">
+        <div className="card-list compact-stack">
           {aiProviders.map((provider: any) => (
-            <article className="provider-block" key={provider.engine}>
+            <article className="provider-block compact-card" key={provider.engine}>
               <div className="section-split">
                 <strong>{provider.engine}</strong>
                 <span className={`status-pill ${provider.hasCredential ? "good" : "neutral"}`}>
@@ -206,60 +195,62 @@ export function SettingsPage() {
                 </span>
               </div>
 
-              <label>
-                모델
-                <input
-                  value={provider.model}
-                  onChange={(event) => {
-                    const providers = [...data.providers];
-                    const targetIndex = data.providers.findIndex((item: any) => item.engine === provider.engine);
-                    providers[targetIndex] = { ...provider, model: event.target.value };
-                    setData({ ...data, providers });
-                  }}
-                />
-              </label>
+              <div className="settings-provider-grid">
+                <label>
+                  모델
+                  <input
+                    value={provider.model}
+                    onChange={(event) => {
+                      const providers = [...data.providers];
+                      const targetIndex = data.providers.findIndex((item: any) => item.engine === provider.engine);
+                      providers[targetIndex] = { ...provider, model: event.target.value };
+                      setData({ ...data, providers });
+                    }}
+                  />
+                </label>
 
-              <label>
-                글당 최대 게시글 수
-                <input
-                  type="number"
-                  value={provider.maxPostsPerRun}
-                  onChange={(event) => {
-                    const providers = [...data.providers];
-                    const targetIndex = data.providers.findIndex((item: any) => item.engine === provider.engine);
-                    providers[targetIndex] = { ...provider, maxPostsPerRun: Number(event.target.value) };
-                    setData({ ...data, providers });
-                  }}
-                />
-              </label>
+                <label>
+                  글당 최대 게시글 수
+                  <input
+                    type="number"
+                    value={provider.maxPostsPerRun}
+                    onChange={(event) => {
+                      const providers = [...data.providers];
+                      const targetIndex = data.providers.findIndex((item: any) => item.engine === provider.engine);
+                      providers[targetIndex] = { ...provider, maxPostsPerRun: Number(event.target.value) };
+                      setData({ ...data, providers });
+                    }}
+                  />
+                </label>
 
-              <label>
-                글당 최대 문자 수
-                <input
-                  type="number"
-                  value={provider.maxCharsPerPost}
-                  onChange={(event) => {
-                    const providers = [...data.providers];
-                    const targetIndex = data.providers.findIndex((item: any) => item.engine === provider.engine);
-                    providers[targetIndex] = { ...provider, maxCharsPerPost: Number(event.target.value) };
-                    setData({ ...data, providers });
-                  }}
-                />
-              </label>
+                <label>
+                  글당 최대 문자 수
+                  <input
+                    type="number"
+                    value={provider.maxCharsPerPost}
+                    onChange={(event) => {
+                      const providers = [...data.providers];
+                      const targetIndex = data.providers.findIndex((item: any) => item.engine === provider.engine);
+                      providers[targetIndex] = { ...provider, maxCharsPerPost: Number(event.target.value) };
+                      setData({ ...data, providers });
+                    }}
+                  />
+                </label>
 
-              <label>
-                최대 출력 토큰
-                <input
-                  type="number"
-                  value={provider.maxOutputTokens}
-                  onChange={(event) => {
-                    const providers = [...data.providers];
-                    const targetIndex = data.providers.findIndex((item: any) => item.engine === provider.engine);
-                    providers[targetIndex] = { ...provider, maxOutputTokens: Number(event.target.value) };
-                    setData({ ...data, providers });
-                  }}
-                />
-              </label>
+                <label>
+                  최대 출력 토큰
+                  <input
+                    type="number"
+                    value={provider.maxOutputTokens}
+                    onChange={(event) => {
+                      const providers = [...data.providers];
+                      const targetIndex = data.providers.findIndex((item: any) => item.engine === provider.engine);
+                      providers[targetIndex] = { ...provider, maxOutputTokens: Number(event.target.value) };
+                      setData({ ...data, providers });
+                    }}
+                  />
+                </label>
+              </div>
 
               <p className="muted">fallback: {provider.fallbackEngine ?? "algorithm"}</p>
             </article>
