@@ -1,11 +1,11 @@
 import type {
+  AnalysisEngine,
   AnalyzeRequest,
   Blog,
   BlogCreateInput,
   BlogDiscoveryResult,
   BlogWithStats,
   DashboardResponse,
-  ProviderName,
   SettingsPayload,
 } from "@blog-review/shared";
 
@@ -63,5 +63,5 @@ export const api = {
       method: "PUT",
       body: JSON.stringify(payload),
     }),
-  getProviderModels: (provider: ProviderName) => request(`/api/providers/${provider}/models`),
+  getProviderModels: (engine: AnalysisEngine) => request(`/api/providers/${engine}/models`),
 };

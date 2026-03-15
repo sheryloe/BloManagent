@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import type {
+  AnalysisEngine,
   AppSettings,
-  ProviderName,
   ProviderSettings,
   SettingsPayload,
 } from "@blog-review/shared";
@@ -18,27 +18,41 @@ const defaultAppSettings = (): AppSettings => ({
   sitemapPriority: true,
   recrawlPolicy: "changedOnly",
   collectEngagementSnapshots: true,
+  allowNaverPublicCrawl: false,
   analysisRangeDefault: "latest30",
   monthlyBudgetLimit: 30,
   maxEstimatedCostPerRun: 3,
   fallbackOnOverBudget: true,
 });
 
+const uniqueProviderRows = (rows: Array<typeof providerSettings.$inferSelect>) => {
+  const seen = new Set<string>();
+  return [...rows]
+    .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
+    .filter((row) => {
+      if (seen.has(row.provider)) return false;
+      seen.add(row.provider);
+      return true;
+    });
+};
+
 const mapProviderRow = async (row: typeof providerSettings.$inferSelect): Promise<ProviderSettings> =>
   providerSettingsSchema.parse({
-    provider: row.provider,
+    engine: row.provider,
     model: row.model,
-    isDefault: toBoolean(row.isDefault),
+    isDefault: row.provider === "algorithm" ? true : toBoolean(row.isDefault),
     analysisMode: row.analysisMode,
     maxPostsPerRun: row.maxPostsPerRun,
     maxCharsPerPost: row.maxCharsPerPost,
     maxOutputTokens: row.maxOutputTokens,
     timeoutMs: row.timeoutMs,
     retryCount: row.retryCount,
-    fallbackProvider: row.fallbackProvider,
+    fallbackEngine: row.fallbackProvider,
     ollamaBaseUrl: row.ollamaBaseUrl,
     hasCredential:
-      row.provider === "google"
+      row.provider === "algorithm"
+        ? true
+        : row.provider === "google"
         ? await secretStore.has("googleApiKey")
         : row.provider === "openai"
           ? await secretStore.has("openaiApiKey")
@@ -46,7 +60,7 @@ const mapProviderRow = async (row: typeof providerSettings.$inferSelect): Promis
   });
 
 export const getProviderSettings = async () => {
-  const rows = await db.select().from(providerSettings);
+  const rows = uniqueProviderRows(await db.select().from(providerSettings));
   return Promise.all(rows.map(mapProviderRow));
 };
 
@@ -70,24 +84,41 @@ export const saveSettings = async (payload: SettingsPayload) => {
   const now = nowIso();
 
   for (const provider of parsed.providers) {
-    const existing = await db.select().from(providerSettings).where(eq(providerSettings.provider, provider.provider));
+    const existing = await db.select().from(providerSettings).where(eq(providerSettings.provider, provider.engine));
     if (existing.length) {
       await db
         .update(providerSettings)
         .set({
           model: provider.model,
-          isDefault: provider.isDefault ? 1 : 0,
+          isDefault: provider.engine === "algorithm" ? 1 : provider.isDefault ? 1 : 0,
           analysisMode: provider.analysisMode,
           maxPostsPerRun: provider.maxPostsPerRun,
           maxCharsPerPost: provider.maxCharsPerPost,
           maxOutputTokens: provider.maxOutputTokens,
           timeoutMs: provider.timeoutMs,
           retryCount: provider.retryCount,
-          fallbackProvider: provider.fallbackProvider ?? null,
+          fallbackProvider: provider.fallbackEngine ?? null,
           ollamaBaseUrl: provider.ollamaBaseUrl ?? null,
           updatedAt: now,
         })
-        .where(eq(providerSettings.provider, provider.provider));
+        .where(eq(providerSettings.provider, provider.engine));
+    } else {
+      await db.insert(providerSettings).values({
+        id: `pset-${provider.engine}`,
+        provider: provider.engine,
+        model: provider.model,
+        isDefault: provider.engine === "algorithm" ? 1 : provider.isDefault ? 1 : 0,
+        analysisMode: provider.analysisMode,
+        maxPostsPerRun: provider.maxPostsPerRun,
+        maxCharsPerPost: provider.maxCharsPerPost,
+        maxOutputTokens: provider.maxOutputTokens,
+        timeoutMs: provider.timeoutMs,
+        retryCount: provider.retryCount,
+        fallbackProvider: provider.fallbackEngine ?? null,
+        ollamaBaseUrl: provider.ollamaBaseUrl ?? null,
+        createdAt: now,
+        updatedAt: now,
+      });
     }
   }
 
@@ -108,10 +139,11 @@ export const saveSettings = async (payload: SettingsPayload) => {
   return getSettingsPayload();
 };
 
-export const resolveProviderSetting = async (requestedProvider?: ProviderName) => {
-  const rows = await db.select().from(providerSettings);
+export const resolveProviderSetting = async (requestedProvider?: AnalysisEngine) => {
+  const rows = uniqueProviderRows(await db.select().from(providerSettings));
   const row =
     rows.find((item) => item.provider === requestedProvider) ??
+    rows.find((item) => item.provider === "algorithm") ??
     rows.find((item) => item.isDefault === 1) ??
     rows[0];
 
@@ -120,32 +152,32 @@ export const resolveProviderSetting = async (requestedProvider?: ProviderName) =
   }
 
   return {
-    provider: row.provider as ProviderName,
+    provider: row.provider as AnalysisEngine,
     model: row.model,
-    analysisMode: row.analysisMode as ProviderSettings["analysisMode"],
+    analysisMode: row.analysisMode as ProviderSettingsRow["analysisMode"],
     maxPostsPerRun: row.maxPostsPerRun,
     maxCharsPerPost: row.maxCharsPerPost,
     maxOutputTokens: row.maxOutputTokens,
     timeoutMs: row.timeoutMs,
     retryCount: row.retryCount,
-    fallbackProvider: row.fallbackProvider as ProviderName | null,
+    fallbackProvider: row.fallbackProvider as AnalysisEngine | null,
     ollamaBaseUrl: row.ollamaBaseUrl,
   } satisfies ProviderSettingsRow;
 };
 
-export const getProviderSettingRow = async (provider: ProviderName) => {
+export const getProviderSettingRow = async (provider: AnalysisEngine) => {
   const row = await db.select().from(providerSettings).where(eq(providerSettings.provider, provider)).get();
   if (!row) return null;
   return {
-    provider: row.provider as ProviderName,
+    provider: row.provider as AnalysisEngine,
     model: row.model,
-    analysisMode: row.analysisMode as ProviderSettings["analysisMode"],
+    analysisMode: row.analysisMode as ProviderSettingsRow["analysisMode"],
     maxPostsPerRun: row.maxPostsPerRun,
     maxCharsPerPost: row.maxCharsPerPost,
     maxOutputTokens: row.maxOutputTokens,
     timeoutMs: row.timeoutMs,
     retryCount: row.retryCount,
-    fallbackProvider: row.fallbackProvider as ProviderName | null,
+    fallbackProvider: row.fallbackProvider as AnalysisEngine | null,
     ollamaBaseUrl: row.ollamaBaseUrl,
   } satisfies ProviderSettingsRow;
 };

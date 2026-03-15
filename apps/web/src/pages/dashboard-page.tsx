@@ -6,15 +6,16 @@ import { api } from "../api";
 const formatDate = (value?: string | null) => (value ? new Date(value).toLocaleString("ko-KR") : "-");
 
 const formatDelta = (value: number | null) => {
-  if (value == null) return "비교 데이터 없음";
+  if (value == null) return "변화 없음";
   return `${value >= 0 ? "+" : ""}${value.toFixed(1)}`;
 };
 
-const healthLabel = (score: number | null) => {
-  if (score == null) return { label: "미분석", tone: "neutral" };
-  if (score >= 80) return { label: "안정", tone: "good" };
-  if (score >= 65) return { label: "관찰", tone: "watch" };
-  return { label: "보완 필요", tone: "risk" };
+const qualityTone = (score: number | null) => {
+  if (score == null) return { label: "미분석", tone: "neutral" as const };
+  if (score >= 80) return { label: "우수", tone: "good" as const };
+  if (score >= 65) return { label: "안정", tone: "watch" as const };
+  if (score >= 50) return { label: "주의", tone: "watch" as const };
+  return { label: "보완 필요", tone: "risk" as const };
 };
 
 export function DashboardPage() {
@@ -32,69 +33,40 @@ export function DashboardPage() {
     if (!data) return null;
 
     const totalPosts = data.blogs.reduce((sum, blog) => sum + blog.postCount, 0);
-    const scoredBlogs = data.blogs.filter((blog) => blog.latestEbiScore != null);
-    const averageEbi =
-      scoredBlogs.length > 0
-        ? scoredBlogs.reduce((sum, blog) => sum + (blog.latestEbiScore ?? 0), 0) / scoredBlogs.length
-        : null;
-    const attentionBlogs = data.blogs.filter((blog) => blog.latestEbiScore == null || (blog.latestEbiScore ?? 0) < 65);
-    const activeRuns = data.latestRuns.filter((run) => run.status === "queued" || run.status === "in_progress").length;
-    const blogNameById = new Map(data.blogs.map((blog) => [blog.id, blog.name]));
+    const averageQuality =
+      data.blogs.filter((blog) => blog.latestQualityScore != null).reduce((sum, blog, _, list) => {
+        return sum + (blog.latestQualityScore ?? 0) / Math.max(list.length, 1);
+      }, 0) || null;
+    const watchPosts = data.blogs.reduce((sum, blog) => sum + blog.watchPostCount, 0);
     const recommendationByBlog = new Map(
-      data.latestRecommendations
-        .filter((item) => item.blogId)
-        .map((item) => [item.blogId as string, item]),
+      data.latestRecommendations.filter((item) => item.blogId).map((item) => [item.blogId as string, item]),
     );
-
-    const healthCards = [...data.blogs]
-      .sort((left, right) => {
-        const leftScore = left.latestEbiScore ?? -1;
-        const rightScore = right.latestEbiScore ?? -1;
-        return leftScore - rightScore;
-      })
-      .map((blog) => {
-        const delta =
-          blog.latestEbiScore != null && blog.previousEbiScore != null
-            ? blog.latestEbiScore - blog.previousEbiScore
-            : null;
-
-        return {
-          ...blog,
-          delta,
-          health: healthLabel(blog.latestEbiScore ?? null),
-          nextAction: recommendationByBlog.get(blog.id) ?? null,
-        };
-      });
-
-    const providerSummary = Array.from(
+    const engineSummary = Array.from(
       data.latestRuns.reduce((map, run) => {
-        map.set(run.provider, (map.get(run.provider) ?? 0) + 1);
+        map.set(run.engine, (map.get(run.engine) ?? 0) + 1);
         return map;
       }, new Map<string, number>()),
     );
 
-    const priorityBlogs = [...data.blogs]
-      .sort((left, right) => {
-        const leftTime = left.lastCrawlAt ? new Date(left.lastCrawlAt).getTime() : 0;
-        const rightTime = right.lastCrawlAt ? new Date(right.lastCrawlAt).getTime() : 0;
-        return leftTime - rightTime;
-      })
-      .slice(0, 5);
-
-    const recommendations = data.latestRecommendations.map((item) => ({
-      ...item,
-      blogName: item.blogId ? blogNameById.get(item.blogId) ?? "공통" : "공통",
-    }));
+    const blogCards = [...data.blogs]
+      .map((blog) => ({
+        ...blog,
+        delta:
+          blog.latestQualityScore != null && blog.previousQualityScore != null
+            ? blog.latestQualityScore - blog.previousQualityScore
+            : null,
+        nextAction: recommendationByBlog.get(blog.id) ?? null,
+        health: qualityTone(blog.latestQualityScore),
+      }))
+      .sort((left, right) => (left.latestQualityScore ?? -1) - (right.latestQualityScore ?? -1));
 
     return {
       totalPosts,
-      averageEbi,
-      attentionBlogs,
-      activeRuns,
-      healthCards,
-      providerSummary,
-      priorityBlogs,
-      recommendations,
+      averageQuality,
+      watchPosts,
+      activeRuns: data.latestRuns.filter((run) => run.status === "queued" || run.status === "in_progress").length,
+      blogCards,
+      engineSummary,
     };
   }, [data]);
 
@@ -106,9 +78,9 @@ export function DashboardPage() {
       <section className="hero dashboard-hero">
         <div>
           <p className="eyebrow">Dashboard</p>
-          <h2>지금 바로 손봐야 할 블로그 운영 포인트</h2>
+          <h2>게시글 단위로 먼저 손볼 곳을 바로 확인하세요</h2>
           <p className="muted">
-            최근 분석 점수, 마지막 수집 시각, 최신 추천 액션을 묶어서 블로그별 우선순위를 빠르게 볼 수 있게 정리했습니다.
+            평균 점수보다 지금 낮은 글과 반복 이슈를 먼저 보여주도록 구성했습니다. 수집된 글 수, 최근 분석, 다음 액션을 한 번에 봅니다.
           </p>
         </div>
 
@@ -118,16 +90,16 @@ export function DashboardPage() {
             <strong>{data.blogs.length}</strong>
           </div>
           <div className="metric-card">
-            <span>수집된 글</span>
+            <span>수집 글 수</span>
             <strong>{derived.totalPosts}</strong>
           </div>
           <div className="metric-card">
-            <span>평균 EBI</span>
-            <strong>{derived.averageEbi?.toFixed(1) ?? "-"}</strong>
+            <span>평균 품질 점수</span>
+            <strong>{derived.averageQuality ? derived.averageQuality.toFixed(1) : "-"}</strong>
           </div>
           <div className="metric-card">
-            <span>보완 필요</span>
-            <strong>{derived.attentionBlogs.length}</strong>
+            <span>주의 글 수</span>
+            <strong>{derived.watchPosts}</strong>
           </div>
         </div>
       </section>
@@ -135,11 +107,11 @@ export function DashboardPage() {
       <section className="grid two">
         <div className="panel">
           <div className="section-header">
-            <h3>블로그별 상태</h3>
+            <h3>블로그 상태</h3>
           </div>
 
           <div className="card-list">
-            {derived.healthCards.map((blog) => (
+            {derived.blogCards.map((blog) => (
               <article className="stack-item insight-card" key={blog.id}>
                 <div className="section-split">
                   <div>
@@ -153,8 +125,9 @@ export function DashboardPage() {
 
                 <div className="pill-row">
                   <span className="pill">{blog.platform}</span>
-                  <span className="pill">글 {blog.postCount}</span>
-                  <span className="pill">EBI {blog.latestEbiScore?.toFixed(1) ?? "-"}</span>
+                  <span className="pill">최신 점수 {blog.latestQualityScore?.toFixed(1) ?? "-"}</span>
+                  <span className="pill">분석 글 {blog.analyzedPostCount}</span>
+                  <span className="pill">주의 글 {blog.watchPostCount}</span>
                   <span className={blog.delta != null && blog.delta >= 0 ? "pill delta up" : "pill delta down"}>
                     {formatDelta(blog.delta)}
                   </span>
@@ -162,19 +135,24 @@ export function DashboardPage() {
 
                 <div className="insight-grid">
                   <div>
-                    <small className="muted">최근 수집</small>
+                    <small className="muted">마지막 수집</small>
                     <p>{formatDate(blog.lastCrawlAt)}</p>
                   </div>
                   <div>
-                    <small className="muted">최근 분석</small>
+                    <small className="muted">마지막 분석</small>
                     <p>{formatDate(blog.latestRunAt)}</p>
                   </div>
                 </div>
 
                 <div className="action-box">
-                  <small className="muted">다음 보완 포인트</small>
-                  <strong>{blog.nextAction?.title ?? "아직 추천이 없습니다."}</strong>
-                  <p>{blog.nextAction?.description ?? "먼저 수집과 분석을 실행하면 블로그별 개선 포인트가 여기에 표시됩니다."}</p>
+                  <small className="muted">반복 이슈</small>
+                  <p>{blog.topIssues.length ? blog.topIssues.join(", ") : "아직 반복 이슈가 집계되지 않았습니다."}</p>
+                </div>
+
+                <div className="action-box">
+                  <small className="muted">다음 액션</small>
+                  <strong>{blog.nextAction?.title ?? "먼저 수집과 분석을 실행해 주세요."}</strong>
+                  <p>{blog.nextAction?.description ?? "최근 분석이 쌓이면 블로그별 우선 액션을 자동으로 보여줍니다."}</p>
                 </div>
               </article>
             ))}
@@ -183,33 +161,37 @@ export function DashboardPage() {
 
         <div className="panel">
           <div className="section-header">
-            <h3>최근 추천 액션</h3>
+            <h3>먼저 손볼 게시글</h3>
           </div>
 
           <div className="stack-list">
-            {derived.recommendations.length ? (
-              derived.recommendations.map((item) => (
-                <article className="stack-item" key={item.id}>
+            {data.latestPostDiagnostics.length ? (
+              data.latestPostDiagnostics.map((item) => (
+                <article className="stack-item" key={item.postId}>
                   <div className="pill-row">
                     <span className="pill">{item.blogName}</span>
-                    <span className="pill">{item.recommendationType}</span>
-                    <span className="pill">우선순위 {item.priority}</span>
+                    <span className="pill">점수 {item.qualityScore}</span>
+                    <span className={`status-pill ${qualityTone(item.qualityScore).tone}`}>
+                      {qualityTone(item.qualityScore).label}
+                    </span>
                   </div>
-                  <strong>{item.title}</strong>
-                  <p>{item.description}</p>
-                  {item.actionItems.length ? (
-                    <div className="pill-row">
-                      {item.actionItems.map((action) => (
-                        <span className="pill" key={action}>
-                          {action}
-                        </span>
-                      ))}
-                    </div>
-                  ) : null}
+                  <strong>
+                    <a href={item.url} rel="noreferrer" target="_blank">
+                      {item.title}
+                    </a>
+                  </strong>
+                  <p>{item.summary ?? "요약 없음"}</p>
+                  <div className="pill-row">
+                    {item.topImprovements.map((improvement) => (
+                      <span className="pill" key={improvement}>
+                        {improvement}
+                      </span>
+                    ))}
+                  </div>
                 </article>
               ))
             ) : (
-              <p className="muted">아직 표시할 추천이 없습니다. 블로그를 등록하고 분석을 한 번 실행해 보세요.</p>
+              <p className="muted">아직 게시글 분석 결과가 없습니다. 블로그를 등록하고 Analyze Now를 실행해 주세요.</p>
             )}
           </div>
         </div>
@@ -218,7 +200,36 @@ export function DashboardPage() {
       <section className="grid two">
         <div className="panel">
           <div className="section-header">
-            <h3>운영 리듬</h3>
+            <h3>최근 추천 액션</h3>
+          </div>
+          <div className="stack-list">
+            {data.latestRecommendations.length ? (
+              data.latestRecommendations.map((item) => (
+                <article className="stack-item" key={item.id}>
+                  <div className="pill-row">
+                    <span className="pill">{item.recommendationType}</span>
+                    <span className="pill">우선순위 {item.priority}</span>
+                  </div>
+                  <strong>{item.title}</strong>
+                  <p>{item.description}</p>
+                  <div className="pill-row">
+                    {item.actionItems.map((action) => (
+                      <span className="pill" key={action}>
+                        {action}
+                      </span>
+                    ))}
+                  </div>
+                </article>
+              ))
+            ) : (
+              <p className="muted">추천 액션은 분석 결과가 생기면 자동으로 채워집니다.</p>
+            )}
+          </div>
+        </div>
+
+        <div className="panel">
+          <div className="section-header">
+            <h3>운영 요약</h3>
           </div>
 
           <div className="dashboard-summary-grid">
@@ -237,29 +248,10 @@ export function DashboardPage() {
           </div>
 
           <div className="pill-row summary-pills">
-            {derived.providerSummary.map(([provider, count]) => (
-              <span className="pill" key={provider}>
-                {provider} {count}
+            {derived.engineSummary.map(([engine, count]) => (
+              <span className="pill" key={engine}>
+                {engine} {count}
               </span>
-            ))}
-          </div>
-        </div>
-
-        <div className="panel">
-          <div className="section-header">
-            <h3>점검 우선순위</h3>
-          </div>
-
-          <div className="stack-list">
-            {derived.priorityBlogs.map((blog) => (
-              <article className="stack-item" key={blog.id}>
-                <strong>{blog.name}</strong>
-                <p className="muted">{blog.mainUrl}</p>
-                <div className="pill-row">
-                  <span className="pill">마지막 수집 {formatDate(blog.lastCrawlAt)}</span>
-                  <span className="pill">마지막 분석 {formatDate(blog.latestRunAt)}</span>
-                </div>
-              </article>
             ))}
           </div>
         </div>
@@ -273,16 +265,16 @@ export function DashboardPage() {
         <div className="table">
           <div className="table-row table-head table-six">
             <span>시작</span>
-            <span>제공자</span>
+            <span>엔진</span>
             <span>모델</span>
             <span>상태</span>
-            <span>포스트</span>
+            <span>글 수</span>
             <span>비용</span>
           </div>
           {data.latestRuns.map((run) => (
             <div className="table-row table-six" key={run.id}>
               <span>{new Date(run.startedAt).toLocaleString("ko-KR")}</span>
-              <span>{run.provider}</span>
+              <span>{run.engine}</span>
               <span>{run.model}</span>
               <span>{run.status}</span>
               <span>{run.postCount}</span>

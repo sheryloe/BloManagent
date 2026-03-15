@@ -1,3 +1,3 @@
 export * from "./schemas";
 export * from "./types";
-export * from "./ebi";
+export * from "./score";

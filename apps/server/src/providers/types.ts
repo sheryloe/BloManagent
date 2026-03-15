@@ -1,10 +1,10 @@
 import type {
   AnalysisMode,
+  AnalysisEngine,
+  AnalysisSummary,
   PlatformName,
   PostAnalysis,
-  ProviderName,
   Recommendation,
-  WeeklySummary,
 } from "@blog-review/shared";
 
 export interface AnalyzePostInput {
@@ -39,7 +39,7 @@ export interface RecommendationInput {
   blogName: string;
   analysisMode: AnalysisMode;
   maxOutputTokens: number;
-  weeklySummary: WeeklySummary;
+  weeklySummary: AnalysisSummary;
   postAnalyses: Array<{
     title: string;
     url: string;
@@ -59,7 +59,7 @@ export interface ProviderResult<T> {
 }
 
 export interface ProviderSettingsRow {
-  provider: ProviderName;
+  provider: AnalysisEngine;
   model: string;
   analysisMode: AnalysisMode;
   maxPostsPerRun: number;
@@ -67,14 +67,14 @@ export interface ProviderSettingsRow {
   maxOutputTokens: number;
   timeoutMs: number;
   retryCount: number;
-  fallbackProvider?: ProviderName | null;
+  fallbackProvider?: AnalysisEngine | null;
   ollamaBaseUrl?: string | null;
 }
 
 export interface AIProvider {
-  name: ProviderName;
+  name: AnalysisEngine;
   analyzePost(input: AnalyzePostInput, settings: ProviderSettingsRow): Promise<ProviderResult<PostAnalysis>>;
-  summarizeWeek(input: SummarizeWeekInput, settings: ProviderSettingsRow): Promise<ProviderResult<WeeklySummary>>;
+  summarizeWeek(input: SummarizeWeekInput, settings: ProviderSettingsRow): Promise<ProviderResult<AnalysisSummary>>;
   generateRecommendations(
     input: RecommendationInput,
     settings: ProviderSettingsRow,

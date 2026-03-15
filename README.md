@@ -1,56 +1,56 @@
 # BloManagent
 
-티스토리, 네이버 블로그, Blogger, WordPress 공개 블로그를 수집하고 비교 분석하는 워크스페이스입니다.
+공개 블로그 메인 URL을 넣고 게시글별 `qualityScore`와 보완 포인트를 확인하는 로컬 중심 오픈소스 워크스페이스입니다.
 
 - Repository: https://github.com/sheryloe/BloManagent
 - Landing page: https://sheryloe.github.io/BloManagent/
 - Help / Manual: https://sheryloe.github.io/BloManagent/help.html
-- Audience: 여러 블로그를 동시에 운영하며 로컬에서 분석을 축적하고 싶은 사용자
 
-## Search Summary
-공개 블로그 분석 워크스페이스
+## What It Does
 
-## Problem This Repo Solves
-블로그 운영 데이터를 플랫폼별로 따로 관리하면 성장 추이, 주간 비교, AI 요약, 보조 지표 추적이 느리고 번거롭습니다.
+- Tistory, Blogger, WordPress 공개 블로그를 메인 URL 기준으로 수집합니다.
+- RSS, sitemap, WordPress `wp-json`, 메인 링크를 차례대로 확인합니다.
+- 게시글마다 설명 가능한 `qualityScore(0-100)`와 개선 제안을 계산합니다.
+- 기본 분석 엔진은 `algorithm`이며, OpenAI / Google / Ollama는 선택형 보강 기능으로만 사용합니다.
 
-## Key Features
-- 메인 URL 기반 수집과 주간 비교 분석 흐름
-- WordPress `wp-json`, RSS, sitemap, 공개 HTML 기반 수집
-- OpenAI, Google AI Studio, Ollama를 선택할 수 있는 분석 구조
-- 모노레포 기반 서버/웹/공유 패키지 구성
-- 개인 또는 팀이 직접 실행하며 분석 이력을 축적하는 설계
+## Why The Score Changed
 
-## User Flow
-- 블로그 메인 URL 등록
-- 주간 단위 수집 및 분석 실행
-- 대시보드에서 변화량과 AI 해석 비교
-- 도움말 페이지에서 사용 예시와 안전 사용 기준 확인
+기존 내부 종합지표는 설명 가능성이 약했습니다. 지금은 게시글 단위의 `qualityScore`를 대표 점수로 사용하고, 다음 5개 항목을 함께 보여줍니다.
 
-## Tech Stack
-- Node.js
-- TypeScript
-- npm workspaces
-- Server/Web monorepo
+- 제목/훅
+- 가독성
+- 정보 가치
+- 차별성
+- 검색 적합성
+
+## Storybeing Tistory Example
+
+`https://storybeing.tistory.com/` 기준으로 과거의 `53개 수집`은 티스토리 메인 링크 오탐 버그였습니다.
+
+현재 정상 집계는 아래와 같습니다.
+
+- total: 14
+- rss: 10
+- sitemap: 4
+- main: 0
+- wp-json: 0
+
+## Policy Notes
+
+- 공개 페이지만 읽습니다.
+- 로그인, 비공개 글, 권한 우회가 필요한 영역은 수집하지 않습니다.
+- 네이버 블로그는 정책 리스크 때문에 기본 비활성 상태이며, `allowNaverPublicCrawl`을 직접 켜야 수집/분석할 수 있습니다.
 
 ## Quick Start
-- `npm install` 후 `npm run dev`로 서버와 웹을 함께 실행합니다.
-- 프로덕션 점검 시 `npm run build`와 `npm run start`를 사용합니다.
-- 로컬 환경 변수는 `.env.example`을 기준으로 맞춥니다.
 
-## Repository Structure
-- `apps/`: 서버와 웹 애플리케이션
-- `packages/`: 공용 로직
-- `docs/`: 백테스트와 운영 문서
+```bash
+npm install
+npm run dev
+```
 
-## Search Keywords
-`blog analytics dashboard`, `tistory naver blogger wordpress analytics`, `블로그 분석 대시보드`, `공개 블로그 분석`
+빌드와 실행:
 
-## FAQ
-### BloManagent는 무엇을 분석하나요?
-티스토리, 네이버 블로그, Blogger, WordPress 공개 블로그의 변화 추이와 게시물 흐름을 분석합니다.
-
-### 어떤 방식으로 수집하나요?
-공개 RSS, sitemap, WordPress `wp-json`, 본문 HTML을 순차 확인하는 방식으로 수집합니다.
-
-### AI 제공자는 어떤 것을 쓰나요?
-OpenAI, Google AI Studio, Ollama 같은 옵션을 고려한 구조입니다.
+```bash
+npm run build
+npm run start
+```

@@ -3,6 +3,14 @@ import { useParams } from "react-router-dom";
 import { api } from "../api";
 import { TrendSparkline } from "../components/trend";
 
+const qualityTone = (score: number | null) => {
+  if (score == null) return { label: "미분석", tone: "neutral" as const };
+  if (score >= 80) return { label: "우수", tone: "good" as const };
+  if (score >= 65) return { label: "안정", tone: "watch" as const };
+  if (score >= 50) return { label: "주의", tone: "watch" as const };
+  return { label: "보완 필요", tone: "risk" as const };
+};
+
 export function BlogDetailPage() {
   const { blogId } = useParams();
   const [data, setData] = useState<any>(null);
@@ -17,7 +25,7 @@ export function BlogDetailPage() {
   }, [blogId]);
 
   if (error) return <div className="panel error">{error}</div>;
-  if (!data) return <div className="panel">불러오는 중...</div>;
+  if (!data) return <div className="panel">블로그 상세를 불러오는 중입니다.</div>;
 
   return (
     <div className="page">
@@ -59,16 +67,16 @@ export function BlogDetailPage() {
           <div className="table">
             <div className="table-row table-head">
               <span>시작</span>
-              <span>EBI</span>
-              <span>제목</span>
-              <span>구조</span>
+              <span>품질 점수</span>
+              <span>제목/훅</span>
+              <span>가독성</span>
             </div>
             {data.scoreHistory.map((row: any) => (
               <div className="table-row" key={row.startedAt}>
                 <span>{new Date(row.startedAt).toLocaleDateString("ko-KR")}</span>
-                <span>{row.ebiScore.toFixed(1)}</span>
-                <span>{row.avgTitleStrength.toFixed(1)}</span>
-                <span>{row.avgStructureScore.toFixed(1)}</span>
+                <span>{row.qualityScore.toFixed(1)}</span>
+                <span>{row.headlineScore.toFixed(1)}</span>
+                <span>{row.readabilityScore.toFixed(1)}</span>
               </div>
             ))}
           </div>
@@ -77,26 +85,60 @@ export function BlogDetailPage() {
 
       <section className="panel">
         <div className="section-header">
-          <h3>포스트 목록</h3>
+          <h3>게시글 진단 결과</h3>
         </div>
-        <div className="table">
-          <div className="table-row table-head">
-            <span>제목</span>
-            <span>발행일</span>
-            <span>카테고리</span>
-            <span>토픽</span>
-          </div>
+
+        <div className="stack-list">
           {data.posts.map((post: any) => (
-            <div className="table-row" key={post.id}>
-              <span>
-                <a href={post.url} rel="noreferrer" target="_blank">
-                  {post.title ?? post.url}
-                </a>
-              </span>
-              <span>{post.publishedAt ? new Date(post.publishedAt).toLocaleDateString("ko-KR") : "-"}</span>
-              <span>{post.categoryName ?? "-"}</span>
-              <span>{post.topicLabels.join(", ") || "-"}</span>
-            </div>
+            <article className="stack-item post-diagnostic-card" key={post.id}>
+              <div className="section-split">
+                <div>
+                  <strong>
+                    <a href={post.url} rel="noreferrer" target="_blank">
+                      {post.title ?? post.url}
+                    </a>
+                  </strong>
+                  <p className="muted">
+                    {post.publishedAt ? new Date(post.publishedAt).toLocaleDateString("ko-KR") : "-"} /{" "}
+                    {post.categoryName ?? "미분류"}
+                  </p>
+                </div>
+                <span className={`status-pill ${qualityTone(post.qualityScore).tone}`}>
+                  {post.qualityScore != null ? `${post.qualityScore}점` : "미분석"}
+                </span>
+              </div>
+
+              <div className="pill-row">
+                <span className="pill">제목/훅 {post.headlineScore ?? "-"}</span>
+                <span className="pill">가독성 {post.readabilityScore ?? "-"}</span>
+                <span className="pill">정보 가치 {post.valueScore ?? "-"}</span>
+                <span className="pill">차별성 {post.originalityScore ?? "-"}</span>
+                <span className="pill">검색 적합성 {post.searchFitScore ?? "-"}</span>
+              </div>
+
+              <p>{post.summary ?? "요약 없음"}</p>
+
+              {post.topicLabels.length ? (
+                <div className="pill-row">
+                  {post.topicLabels.map((topic: string) => (
+                    <span className="pill" key={topic}>
+                      {topic}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+
+              <div className="grid two diagnostic-grid">
+                <div className="action-box">
+                  <small className="muted">약점</small>
+                  <p>{post.weaknesses.length ? post.weaknesses.join(" ") : "약점이 아직 집계되지 않았습니다."}</p>
+                </div>
+                <div className="action-box">
+                  <small className="muted">개선 제안</small>
+                  <p>{post.improvements.length ? post.improvements.join(" ") : "개선 제안이 아직 없습니다."}</p>
+                </div>
+              </div>
+            </article>
           ))}
         </div>
       </section>

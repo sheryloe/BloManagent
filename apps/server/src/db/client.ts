@@ -201,26 +201,20 @@ const createStatements = [
 
 const seedProviderSettings = [
   {
-    provider: "google",
-    model: "gemini-2.5-flash",
+    provider: "algorithm",
+    model: "deterministic-rules",
     isDefault: 1,
-    fallbackProvider: "ollama",
+    fallbackProvider: null,
   },
   {
     provider: "google",
-    model: "gemini-2.5-flash-lite",
+    model: "gemini-2.5-flash",
     isDefault: 0,
     fallbackProvider: "ollama",
   },
   {
     provider: "openai",
     model: "gpt-5 mini",
-    isDefault: 0,
-    fallbackProvider: "google",
-  },
-  {
-    provider: "openai",
-    model: "gpt-5",
     isDefault: 0,
     fallbackProvider: "google",
   },
@@ -238,6 +232,7 @@ const seedAppSettings = {
   sitemapPriority: true,
   recrawlPolicy: "changedOnly",
   collectEngagementSnapshots: true,
+  allowNaverPublicCrawl: false,
   analysisRangeDefault: "latest30",
   monthlyBudgetLimit: 30,
   maxEstimatedCostPerRun: 3,
@@ -256,29 +251,31 @@ for (const statement of createStatements) {
 export const db = drizzle(sqlite, { schema });
 
 const seedDefaults = () => {
-  const providerCount = sqlite.prepare("SELECT COUNT(*) as count FROM provider_settings").get() as { count: number };
-  if (providerCount.count === 0) {
-    const now = nowIso();
-    const insert = sqlite.prepare(
-      `INSERT INTO provider_settings (
-        id, provider, model, is_default, analysis_mode, max_posts_per_run, max_chars_per_post, max_output_tokens,
-        timeout_ms, retry_count, fallback_provider, ollama_base_url, created_at, updated_at
-      ) VALUES (
-        @id, @provider, @model, @isDefault, 'balanced', 10, 3000, 1200, 30000, 2, @fallbackProvider, 'http://127.0.0.1:11434', @createdAt, @updatedAt
-      )`,
-    );
+  const existingProviders = sqlite
+    .prepare("SELECT provider FROM provider_settings")
+    .all()
+    .map((row) => (row as { provider: string }).provider);
+  const now = nowIso();
+  const insert = sqlite.prepare(
+    `INSERT INTO provider_settings (
+      id, provider, model, is_default, analysis_mode, max_posts_per_run, max_chars_per_post, max_output_tokens,
+      timeout_ms, retry_count, fallback_provider, ollama_base_url, created_at, updated_at
+    ) VALUES (
+      @id, @provider, @model, @isDefault, 'balanced', 10, 3000, 1200, 30000, 2, @fallbackProvider, 'http://127.0.0.1:11434', @createdAt, @updatedAt
+    )`,
+  );
 
-    for (const row of seedProviderSettings) {
-      insert.run({
-        id: createId("pset"),
-        provider: row.provider,
-        model: row.model,
-        isDefault: row.isDefault,
-        fallbackProvider: row.fallbackProvider,
-        createdAt: now,
-        updatedAt: now,
-      });
-    }
+  for (const row of seedProviderSettings) {
+    if (existingProviders.includes(row.provider)) continue;
+    insert.run({
+      id: createId("pset"),
+      provider: row.provider,
+      model: row.model,
+      isDefault: row.isDefault,
+      fallbackProvider: row.fallbackProvider,
+      createdAt: now,
+      updatedAt: now,
+    });
   }
 
   const existingKeys = sqlite

@@ -6,7 +6,7 @@ const links = [
   { to: "/reports", label: "리포트" },
   { to: "/help", label: "도움말" },
   { to: "/settings", label: "설정" },
-  { to: "/logs", label: "로그" },
+  { to: "/logs", label: "실행 로그" },
 ];
 
 export function AppLayout() {
@@ -15,9 +15,9 @@ export function AppLayout() {
       <aside className="sidebar">
         <div className="sidebar-brand">
           <p className="eyebrow">BloManagent</p>
-          <h1>블로그 분석 워크스페이스</h1>
+          <h1>공개 블로그 분석 워크스페이스</h1>
           <p className="muted sidebar-copy">
-            메인 URL 등록부터 공개 페이지 수집, 분석 실행, 다음 액션 정리까지 한 화면에서 관리합니다.
+            메인 URL을 넣고 공개 글을 수집한 뒤, 게시글별 품질 점수와 보완 포인트를 한 화면에서 확인합니다.
           </p>
         </div>
 
@@ -35,9 +35,9 @@ export function AppLayout() {
         </nav>
 
         <div className="sidebar-note">
-          <strong>공개 블로그만 다룹니다.</strong>
+          <strong>기본 분석 엔진은 알고리즘입니다.</strong>
           <p className="muted">
-            로그인 우회나 비공개 글 수집은 하지 않고, 공개 URL 기준으로 RSS, sitemap, 본문 페이지를 순차 확인합니다.
+            OpenAI, Google, Ollama는 선택형 보강 기능으로만 두고, 점수와 우선순위는 규칙 기반으로 계산합니다.
           </p>
         </div>
       </aside>

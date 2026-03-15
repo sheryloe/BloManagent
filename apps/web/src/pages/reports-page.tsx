@@ -12,7 +12,7 @@ export function ReportsPage() {
     <div className="page">
       <section className="panel">
         <div className="section-header">
-          <h3>주간 리포트</h3>
+          <h3>분석 리포트</h3>
         </div>
         <div className="stack-list">
           {reports.map((report) => (
@@ -25,7 +25,7 @@ export function ReportsPage() {
                 </span>
               </div>
               <strong>{report.overallSummary}</strong>
-              <p>다음 주 추천 주제: {report.nextWeekTopics.join(", ") || "-"}</p>
+              <p>다음 주제: {report.nextWeekTopics.join(", ") || "-"}</p>
             </article>
           ))}
         </div>

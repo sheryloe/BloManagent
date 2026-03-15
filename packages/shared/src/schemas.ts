@@ -1,9 +1,11 @@
 import { z } from "zod";
 
-export const providerNameSchema = z.enum(["google", "openai", "ollama"]);
+export const analysisEngineSchema = z.enum(["algorithm", "google", "openai", "ollama"]);
+export const providerNameSchema = analysisEngineSchema;
 export const platformNameSchema = z.enum(["blogger", "tistory", "naver", "wordpress", "generic"]);
 export const analysisModeSchema = z.enum(["fast", "balanced", "deep", "budget"]);
 export const runScopeSchema = z.enum(["latest7", "latest30", "newOnly", "selected", "full"]);
+export const qualityStatusSchema = z.enum(["excellent", "solid", "watch", "needs-work"]);
 
 export const blogSchema = z.object({
   id: z.string(),
@@ -28,10 +30,13 @@ export const blogCreateSchema = z.object({
 
 export const blogWithStatsSchema = blogSchema.extend({
   postCount: z.number().int().nonnegative(),
+  analyzedPostCount: z.number().int().nonnegative(),
+  watchPostCount: z.number().int().nonnegative(),
+  topIssues: z.array(z.string()).max(3),
   latestRunId: z.string().nullable(),
   latestRunAt: z.string().nullable(),
-  latestEbiScore: z.number().nullable(),
-  previousEbiScore: z.number().nullable(),
+  latestQualityScore: z.number().nullable(),
+  previousQualityScore: z.number().nullable(),
   lastCrawlAt: z.string().nullable(),
 });
 
@@ -52,6 +57,13 @@ export const postAnalysisSchema = z.object({
   differentiationScore: z.number().int().min(0).max(100),
   seoPotentialScore: z.number().int().min(0).max(100),
   audienceFitScore: z.number().int().min(0).max(100),
+  headlineScore: z.number().int().min(0).max(100),
+  readabilityScore: z.number().int().min(0).max(100),
+  valueScore: z.number().int().min(0).max(100),
+  originalityScore: z.number().int().min(0).max(100),
+  searchFitScore: z.number().int().min(0).max(100),
+  qualityScore: z.number().int().min(0).max(100),
+  qualityStatus: qualityStatusSchema,
   engagementAdjustmentNote: z.string(),
 });
 
@@ -71,12 +83,12 @@ export const blogScoreSchema = z.object({
   publishingConsistencyScore: z.number(),
   freshnessScore: z.number(),
   engagementScore: z.number(),
-  ebiScore: z.number(),
-  ebiStatus: z.string(),
-  ebiReason: z.array(z.string()),
+  qualityScore: z.number(),
+  status: qualityStatusSchema,
+  reasons: z.array(z.string()),
 });
 
-export const weeklySummarySchema = z.object({
+export const analysisSummarySchema = z.object({
   overallSummary: z.string(),
   topicOverlap: z.array(z.string()),
   topicGaps: z.array(z.string()),
@@ -85,6 +97,8 @@ export const weeklySummarySchema = z.object({
   nextWeekTopics: z.array(z.string()),
   blogScores: z.array(blogScoreSchema),
 });
+
+export const weeklySummarySchema = analysisSummarySchema;
 
 export const recommendationSchema = z.object({
   recommendationType: z.string(),
@@ -98,7 +112,7 @@ export const recommendationSchema = z.object({
 export const runSchema = z.object({
   id: z.string(),
   runScope: runScopeSchema,
-  provider: providerNameSchema,
+  engine: analysisEngineSchema,
   model: z.string(),
   analysisMode: analysisModeSchema,
   startedAt: z.string(),
@@ -126,8 +140,8 @@ export const runDetailsSchema = z.object({
   events: z.array(runEventSchema),
 });
 
-export const providerSettingsSchema = z.object({
-  provider: providerNameSchema,
+export const engineSettingsSchema = z.object({
+  engine: analysisEngineSchema,
   model: z.string(),
   isDefault: z.boolean(),
   analysisMode: analysisModeSchema,
@@ -136,10 +150,12 @@ export const providerSettingsSchema = z.object({
   maxOutputTokens: z.number().int().positive(),
   timeoutMs: z.number().int().positive(),
   retryCount: z.number().int().min(0),
-  fallbackProvider: providerNameSchema.nullable().optional(),
+  fallbackEngine: analysisEngineSchema.nullable().optional(),
   ollamaBaseUrl: z.string().url().nullable().optional(),
   hasCredential: z.boolean().optional(),
 });
+
+export const providerSettingsSchema = engineSettingsSchema;
 
 export const appSettingsSchema = z.object({
   discoveryDepth: z.number().int().min(1).max(5),
@@ -147,6 +163,7 @@ export const appSettingsSchema = z.object({
   sitemapPriority: z.boolean(),
   recrawlPolicy: z.enum(["changedOnly", "always", "newOnly"]),
   collectEngagementSnapshots: z.boolean(),
+  allowNaverPublicCrawl: z.boolean(),
   analysisRangeDefault: runScopeSchema,
   monthlyBudgetLimit: z.number().nonnegative(),
   maxEstimatedCostPerRun: z.number().nonnegative(),
@@ -154,7 +171,7 @@ export const appSettingsSchema = z.object({
 });
 
 export const settingsPayloadSchema = z.object({
-  providers: z.array(providerSettingsSchema),
+  providers: z.array(engineSettingsSchema),
   app: appSettingsSchema,
   secrets: z
     .object({
@@ -165,10 +182,24 @@ export const settingsPayloadSchema = z.object({
     .optional(),
 });
 
+export const postDiagnosticSchema = z.object({
+  postId: z.string(),
+  blogId: z.string(),
+  blogName: z.string(),
+  title: z.string(),
+  url: z.string().url(),
+  publishedAt: z.string().nullable(),
+  qualityScore: z.number().min(0).max(100),
+  qualityStatus: qualityStatusSchema,
+  topImprovements: z.array(z.string()).max(2),
+  summary: z.string().nullable(),
+});
+
 export const dashboardResponseSchema = z.object({
   blogs: z.array(blogWithStatsSchema),
   latestRuns: z.array(runSchema),
   latestRecommendations: z.array(recommendationSchema.extend({ id: z.string(), createdAt: z.string() })),
+  latestPostDiagnostics: z.array(postDiagnosticSchema),
 });
 
 export const discoverySourceCountsSchema = z.object({
@@ -203,10 +234,16 @@ export const reportSchema = z.object({
   createdAt: z.string(),
 });
 
-export const analyzeRequestSchema = z.object({
-  runScope: runScopeSchema.default("latest30"),
-  selectedPostIds: z.array(z.string()).optional(),
-  provider: providerNameSchema.optional(),
-  model: z.string().optional(),
-  analysisMode: analysisModeSchema.optional(),
-});
+export const analyzeRequestSchema = z
+  .object({
+    runScope: runScopeSchema.default("latest30"),
+    selectedPostIds: z.array(z.string()).optional(),
+    engine: analysisEngineSchema.optional(),
+    provider: analysisEngineSchema.optional(),
+    model: z.string().optional(),
+    analysisMode: analysisModeSchema.optional(),
+  })
+  .transform(({ provider, engine, ...rest }) => ({
+    ...rest,
+    engine: engine ?? provider,
+  }));

@@ -61,6 +61,15 @@ label {
   font-weight: 600;
 }
 
+.checkbox-row {
+  grid-template-columns: 1fr auto;
+  align-items: center;
+}
+
+.checkbox-row input {
+  width: auto;
+}
+
 .shell {
   display: grid;
   grid-template-columns: 320px 1fr;
@@ -202,6 +211,7 @@ label {
   padding: 1rem;
   border-radius: 18px;
   background: rgba(244, 240, 223, 0.72);
+  min-width: 0;
 }
 
 .blog-card {
@@ -257,6 +267,11 @@ label {
   gap: 1rem;
   padding: 0.9rem 0;
   border-bottom: 1px solid rgba(17, 35, 25, 0.08);
+}
+
+.table-row > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .table-row.table-six {
@@ -369,6 +384,10 @@ label {
   padding: 0.9rem 1rem;
   border-radius: 16px;
   background: rgba(17, 35, 25, 0.05);
+}
+
+.diagnostic-grid {
+  align-items: start;
 }
 
 .summary-card strong {

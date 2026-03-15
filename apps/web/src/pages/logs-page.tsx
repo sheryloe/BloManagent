@@ -27,7 +27,7 @@ export function LogsPage() {
     <div className="page grid two">
       <section className="panel">
         <div className="section-header">
-          <h3>분석 런 로그</h3>
+          <h3>분석 실행 로그</h3>
         </div>
         <div className="stack-list">
           {runs.map((run) => (
@@ -40,7 +40,7 @@ export function LogsPage() {
               type="button"
             >
               <strong>{new Date(run.startedAt).toLocaleString("ko-KR")}</strong>
-              <span>{run.provider}</span>
+              <span>{run.engine}</span>
               <span>{run.status}</span>
             </button>
           ))}
@@ -62,7 +62,7 @@ export function LogsPage() {
             ))}
           </div>
         ) : (
-          <p className="muted">왼쪽에서 런을 선택하세요.</p>
+          <p className="muted">왼쪽 목록에서 실행을 선택해 주세요.</p>
         )}
       </section>
     </div>

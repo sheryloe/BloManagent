@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { analyzeRequestSchema, blogCreateSchema } from "@blog-review/shared";
 import { analysisCoordinator } from "../services/run-service";
 import {
+  NaverOptInRequiredError,
   createBlog,
   deleteBlog,
   discoverBlogPosts,
@@ -40,6 +41,9 @@ export const registerBlogRoutes = async (app: FastifyInstance) => {
     try {
       return await discoverBlogPosts((request.params as { id: string }).id);
     } catch (error) {
+      if (error instanceof NaverOptInRequiredError) {
+        return reply.status(403).send({ code: error.code, message: error.message });
+      }
       return reply.status(400).send({ message: error instanceof Error ? error.message : "Discover failed." });
     }
   });
@@ -49,6 +53,9 @@ export const registerBlogRoutes = async (app: FastifyInstance) => {
       const body = analyzeRequestSchema.parse(request.body ?? {});
       return reply.status(202).send(await analysisCoordinator.start((request.params as { id: string }).id, body));
     } catch (error) {
+      if (error instanceof NaverOptInRequiredError) {
+        return reply.status(403).send({ code: error.code, message: error.message });
+      }
       return reply.status(400).send({ message: error instanceof Error ? error.message : "Analyze failed." });
     }
   });

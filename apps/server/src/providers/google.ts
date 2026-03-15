@@ -1,7 +1,7 @@
 import { postAnalysisSchema, recommendationSchema, weeklySummarySchema } from "@blog-review/shared";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { secretStore } from "../security/secret-store";
-import { heuristicPostAnalysis, heuristicRecommendations, heuristicWeeklySummary } from "../services/heuristics";
+import { heuristicAnalysisSummary, heuristicPostAnalysis, heuristicRecommendations } from "../services/heuristics";
 import { buildAnalyzePostPrompt, buildRecommendationsPrompt, buildWeeklySummaryPrompt } from "../templates/prompts";
 import type {
   AIProvider,
@@ -66,7 +66,7 @@ class GoogleProvider implements AIProvider {
       schemaName: "weekly_summary",
       prompt: buildWeeklySummaryPrompt(input),
       schema: zodToJsonSchema(weeklySummarySchema),
-      fallback: () => heuristicWeeklySummary(input),
+      fallback: () => heuristicAnalysisSummary(input),
       maxOutputTokens: settings.maxOutputTokens,
     });
   }

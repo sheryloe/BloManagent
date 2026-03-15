@@ -1,10 +1,10 @@
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import {
+  calculateQualityComponents,
   postAnalysisSchema,
   recommendationSchema,
   runDetailsSchema,
   runSchema,
-  weeklySummarySchema,
   type AnalyzeRequest,
   type DashboardResponse,
   type PostAnalysis,
@@ -28,10 +28,24 @@ import { average, createId, daysAgo, limitText, nowIso, safeJsonParse } from "..
 import { getProvider } from "../providers";
 import type { AnalyzePostInput, ProviderSettingsRow } from "../providers/types";
 import { weeklySummaryMarkdown } from "../templates/prompts";
-import { getBlog, listBlogs, discoverBlogPosts } from "./blog-service";
+import { assertBlogCrawlAllowed, discoverBlogPosts, getBlog, listBlogs } from "./blog-service";
+import { heuristicAnalysisSummary, heuristicPostAnalysis, heuristicRecommendations } from "./heuristics";
 import { getProviderSettingRow, resolveProviderSetting } from "./settings-service";
 
 type SelectedPost = typeof posts.$inferSelect;
+
+const mergeNarrative = (base: PostAnalysis, enriched: PostAnalysis): PostAnalysis => ({
+  ...base,
+  summary: enriched.summary || base.summary,
+  targetAudienceGuess: enriched.targetAudienceGuess || base.targetAudienceGuess,
+  intentGuess: enriched.intentGuess || base.intentGuess,
+  topicLabels: enriched.topicLabels.length ? enriched.topicLabels : base.topicLabels,
+  strengths: enriched.strengths.length ? enriched.strengths : base.strengths,
+  weaknesses: enriched.weaknesses.length ? enriched.weaknesses : base.weaknesses,
+  improvements: enriched.improvements.length ? enriched.improvements : base.improvements,
+  seoNotes: enriched.seoNotes.length ? enriched.seoNotes : base.seoNotes,
+  engagementAdjustmentNote: enriched.engagementAdjustmentNote || base.engagementAdjustmentNote,
+});
 
 class AnalysisCoordinator {
   private activeRunId: string | null = null;
@@ -45,15 +59,18 @@ class AnalysisCoordinator {
     if (!blog) {
       throw new Error("Blog not found.");
     }
+    await assertBlogCrawlAllowed(blog);
 
-    let providerSettings = await resolveProviderSetting(input.provider);
+    let providerSettings = await resolveProviderSetting(input.engine);
     if (input.model) providerSettings = { ...providerSettings, model: input.model };
     if (input.analysisMode) providerSettings = { ...providerSettings, analysisMode: input.analysisMode };
 
     const provider = getProvider(providerSettings.provider);
     const validation = await provider.validateConfig(providerSettings);
-    if (!validation.valid && providerSettings.fallbackProvider) {
-      const fallback = await getProviderSettingRow(providerSettings.fallbackProvider);
+    if (!validation.valid) {
+      const fallback =
+        (providerSettings.fallbackProvider ? await getProviderSettingRow(providerSettings.fallbackProvider) : null) ??
+        (providerSettings.provider !== "algorithm" ? await getProviderSettingRow("algorithm") : null);
       if (fallback) providerSettings = fallback;
     }
 
@@ -104,26 +121,26 @@ class AnalysisCoordinator {
 
     try {
       await db.update(analysisRuns).set({ status: "in_progress" }).where(eq(analysisRuns.id, runId));
-      await log("info", "분석 런을 시작했습니다.");
+      await log("info", "Analysis run started.");
 
       const provider = getProvider(providerSettings.provider);
       const validation = await provider.validateConfig(providerSettings);
       if (!validation.valid) {
-        await log("warning", validation.message ?? "선택한 제공자 인증이 없어 휴리스틱 폴백이 사용될 수 있습니다.");
+        await log("warning", validation.message ?? "Selected engine is unavailable, so deterministic analysis is used.");
       }
 
       const discovery = await discoverBlogPosts(blogId);
       await log(
         "info",
-        `포스트 발견 ${discovery.discoveredCount}건, 신규 ${discovery.insertedCount}건, 갱신 ${discovery.updatedCount}건`,
+        `Discovery finished: ${discovery.discoveredCount} found / ${discovery.insertedCount} new / ${discovery.updatedCount} updated.`,
       );
 
       const selectedPosts = await this.selectPosts(blogId, input, providerSettings, discovery.insertedPostIds, discovery.updatedPostIds);
       if (!selectedPosts.length) {
-        throw new Error("분석 대상 포스트가 없습니다.");
+        throw new Error("No posts matched the selected analysis range.");
       }
 
-      await log("info", `분석 대상 포스트 ${selectedPosts.length}건을 선택했습니다.`);
+      await log("info", `Selected ${selectedPosts.length} posts for analysis.`);
 
       const usages = {
         inputTokens: 0,
@@ -162,40 +179,45 @@ class AnalysisCoordinator {
           },
         };
 
-        const analysisResponse = await provider.analyzePost(analysisInput, providerSettings);
-        const result = postAnalysisSchema.parse(analysisResponse.data);
-        usages.inputTokens += analysisResponse.usage.inputTokens;
-        usages.outputTokens += analysisResponse.usage.outputTokens;
-        usages.estimatedCost += analysisResponse.usage.estimatedCost;
+        const baseAnalysis = postAnalysisSchema.parse(heuristicPostAnalysis(analysisInput).data);
+        let finalAnalysis = baseAnalysis;
 
-        analyzedPosts.push({ post, analysis: result });
+        if (providerSettings.provider !== "algorithm") {
+          const enriched = await provider.analyzePost(analysisInput, providerSettings);
+          usages.inputTokens += enriched.usage.inputTokens;
+          usages.outputTokens += enriched.usage.outputTokens;
+          usages.estimatedCost += enriched.usage.estimatedCost;
+          finalAnalysis = mergeNarrative(baseAnalysis, postAnalysisSchema.parse(enriched.data));
+        }
+
+        analyzedPosts.push({ post, analysis: finalAnalysis });
 
         await db.insert(postAnalyses).values({
           id: createId("pa"),
           runId,
           postId: post.id,
-          summary: result.summary,
-          targetAudienceGuess: result.targetAudienceGuess,
-          intentGuess: result.intentGuess,
-          topicLabelsJson: JSON.stringify(result.topicLabels),
-          strengthsJson: JSON.stringify(result.strengths),
-          weaknessesJson: JSON.stringify(result.weaknesses),
-          improvementsJson: JSON.stringify(result.improvements),
-          seoNotesJson: JSON.stringify(result.seoNotes),
-          titleStrength: result.titleStrength,
-          hookStrength: result.hookStrength,
-          structureScore: result.structureScore,
-          informationDensityScore: result.informationDensityScore,
-          practicalityScore: result.practicalityScore,
-          differentiationScore: result.differentiationScore,
-          seoPotentialScore: result.seoPotentialScore,
-          audienceFitScore: result.audienceFitScore,
-          engagementAdjustmentNote: result.engagementAdjustmentNote,
+          summary: finalAnalysis.summary,
+          targetAudienceGuess: finalAnalysis.targetAudienceGuess,
+          intentGuess: finalAnalysis.intentGuess,
+          topicLabelsJson: JSON.stringify(finalAnalysis.topicLabels),
+          strengthsJson: JSON.stringify(finalAnalysis.strengths),
+          weaknessesJson: JSON.stringify(finalAnalysis.weaknesses),
+          improvementsJson: JSON.stringify(finalAnalysis.improvements),
+          seoNotesJson: JSON.stringify(finalAnalysis.seoNotes),
+          titleStrength: finalAnalysis.titleStrength,
+          hookStrength: finalAnalysis.hookStrength,
+          structureScore: finalAnalysis.structureScore,
+          informationDensityScore: finalAnalysis.informationDensityScore,
+          practicalityScore: finalAnalysis.practicalityScore,
+          differentiationScore: finalAnalysis.differentiationScore,
+          seoPotentialScore: finalAnalysis.seoPotentialScore,
+          audienceFitScore: finalAnalysis.audienceFitScore,
+          engagementAdjustmentNote: finalAnalysis.engagementAdjustmentNote,
           createdAt: nowIso(),
         });
       }
 
-      const summaryInput = {
+      const analysisSummaryResult = heuristicAnalysisSummary({
         blogName: discovery.blog.name,
         analysisMode: providerSettings.analysisMode,
         maxOutputTokens: providerSettings.maxOutputTokens,
@@ -204,38 +226,30 @@ class AnalysisCoordinator {
           url: item.post.url,
           analysis: item.analysis,
         })),
-      } as const;
+      });
+      const analysisSummary = analysisSummaryResult.data;
 
-      const weeklySummaryResult = await provider.summarizeWeek(summaryInput, providerSettings);
-      const weeklySummary = weeklySummarySchema.parse(weeklySummaryResult.data);
-      usages.inputTokens += weeklySummaryResult.usage.inputTokens;
-      usages.outputTokens += weeklySummaryResult.usage.outputTokens;
-      usages.estimatedCost += weeklySummaryResult.usage.estimatedCost;
-
-      const recommendationResult = await provider.generateRecommendations(
+      const recommendationResult = heuristicRecommendations(
         {
           blogName: discovery.blog.name,
           analysisMode: providerSettings.analysisMode,
           maxOutputTokens: providerSettings.maxOutputTokens,
-          weeklySummary,
+          weeklySummary: analysisSummary,
           postAnalyses: analyzedPosts.map((item) => ({
             title: item.post.title ?? "Untitled",
             url: item.post.url,
             analysis: item.analysis,
           })),
         },
-        providerSettings,
+        analysisSummary,
       );
       const nextRecommendations = recommendationResult.data.map((item) => recommendationSchema.parse(item));
-      usages.inputTokens += recommendationResult.usage.inputTokens;
-      usages.outputTokens += recommendationResult.usage.outputTokens;
-      usages.estimatedCost += recommendationResult.usage.estimatedCost;
 
       const reportId = createId("report");
       const createdAt = nowIso();
       const weekStart = input.runScope === "latest7" ? daysAgo(7).toISOString() : daysAgo(30).toISOString();
       const weekEnd = createdAt;
-      const score = weeklySummary.blogScores[0] ?? {
+      const score = analysisSummary.blogScores[0] ?? {
         blogId,
         blogName: discovery.blog.name,
         postCount: analyzedPosts.length,
@@ -251,9 +265,9 @@ class AnalysisCoordinator {
         publishingConsistencyScore: 60,
         freshnessScore: 75,
         engagementScore: 50,
-        ebiScore: 60,
-        ebiStatus: "watch",
-        ebiReason: [],
+        qualityScore: 60,
+        status: "watch" as const,
+        reasons: [],
       };
       score.blogId = blogId;
       score.blogName = discovery.blog.name;
@@ -263,13 +277,13 @@ class AnalysisCoordinator {
         runId,
         weekStart,
         weekEnd,
-        overallSummary: weeklySummary.overallSummary,
-        topicOverlapJson: JSON.stringify(weeklySummary.topicOverlap),
-        topicGapsJson: JSON.stringify(weeklySummary.topicGaps),
-        blogComparisonsJson: JSON.stringify(weeklySummary.blogComparisons),
-        priorityActionsJson: JSON.stringify(weeklySummary.priorityActions),
-        nextWeekTopicsJson: JSON.stringify(weeklySummary.nextWeekTopics),
-        markdownReport: weeklySummaryMarkdown(discovery.blog.name, weeklySummary, nextRecommendations),
+        overallSummary: analysisSummary.overallSummary,
+        topicOverlapJson: JSON.stringify(analysisSummary.topicOverlap),
+        topicGapsJson: JSON.stringify(analysisSummary.topicGaps),
+        blogComparisonsJson: JSON.stringify(analysisSummary.blogComparisons),
+        priorityActionsJson: JSON.stringify(analysisSummary.priorityActions),
+        nextWeekTopicsJson: JSON.stringify(analysisSummary.nextWeekTopics),
+        markdownReport: weeklySummaryMarkdown(discovery.blog.name, analysisSummary, nextRecommendations),
         createdAt,
       });
 
@@ -290,9 +304,9 @@ class AnalysisCoordinator {
         publishingConsistencyScore: score.publishingConsistencyScore,
         freshnessScore: score.freshnessScore,
         engagementScore: score.engagementScore,
-        ebiScore: score.ebiScore,
-        ebiStatus: score.ebiStatus,
-        ebiReasonJson: JSON.stringify(score.ebiReason),
+        ebiScore: score.qualityScore,
+        ebiStatus: score.status,
+        ebiReasonJson: JSON.stringify(score.reasons),
         createdAt,
       });
 
@@ -301,14 +315,7 @@ class AnalysisCoordinator {
         for (const topic of item.analysis.topicLabels) {
           const current = topicCounts.get(topic) ?? { count: 0, scores: [] };
           current.count += 1;
-          current.scores.push(
-            average([
-              item.analysis.structureScore,
-              item.analysis.practicalityScore,
-              item.analysis.seoPotentialScore,
-              item.analysis.audienceFitScore,
-            ]),
-          );
+          current.scores.push(item.analysis.qualityScore);
           topicCounts.set(topic, current);
         }
       }
@@ -321,8 +328,8 @@ class AnalysisCoordinator {
           postCount: meta.count,
           avgScore: average(meta.scores),
           overlapScore: meta.count > 1 ? 70 : 30,
-          gapScore: weeklySummary.topicGaps.includes(topic) ? 100 : 20,
-          recommendationPriority: weeklySummary.nextWeekTopics.includes(topic) ? 90 : 55,
+          gapScore: analysisSummary.topicGaps.includes(topic) ? 100 : 20,
+          recommendationPriority: analysisSummary.nextWeekTopics.includes(topic) ? 90 : 55,
           notes: meta.count > 1 ? "반복 노출 주제" : "확장 가능한 주제",
           createdAt,
         });
@@ -366,7 +373,7 @@ class AnalysisCoordinator {
           actualCost: usages.estimatedCost,
         })
         .where(eq(analysisRuns.id, runId));
-      await log("info", "분석 런이 완료되었습니다.");
+      await log("info", "Analysis run completed.");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown analysis error";
       await db
@@ -422,7 +429,7 @@ const mapRun = (row: typeof analysisRuns.$inferSelect): Run =>
   runSchema.parse({
     id: row.id,
     runScope: row.runScope,
-    provider: row.provider,
+    engine: row.provider,
     model: row.model,
     analysisMode: row.analysisMode,
     startedAt: row.startedAt,
@@ -464,6 +471,64 @@ export const getDashboard = async (): Promise<DashboardResponse> => {
   const latestRecommendations = sqlite
     .prepare("SELECT * FROM recommendations ORDER BY created_at DESC LIMIT 10")
     .all() as Array<Record<string, unknown>>;
+  const latestPostRows = sqlite
+    .prepare(
+      `
+      SELECT
+        pa.post_id,
+        pa.summary,
+        pa.improvements_json,
+        pa.title_strength,
+        pa.hook_strength,
+        pa.structure_score,
+        pa.information_density_score,
+        pa.practicality_score,
+        pa.differentiation_score,
+        pa.seo_potential_score,
+        pa.audience_fit_score,
+        p.blog_id,
+        p.title,
+        p.url,
+        p.published_at,
+        b.name as blog_name
+      FROM post_analyses pa
+      JOIN analysis_runs ar ON ar.id = pa.run_id
+      JOIN posts p ON p.id = pa.post_id
+      JOIN blogs b ON b.id = p.blog_id
+      WHERE ar.status = 'completed'
+      ORDER BY pa.created_at DESC
+      LIMIT 30
+      `,
+    )
+    .all() as Array<Record<string, unknown>>;
+
+  const latestPostDiagnostics = latestPostRows
+    .map((row) => {
+      const quality = calculateQualityComponents({
+        titleStrength: Number(row.title_strength ?? 0),
+        hookStrength: Number(row.hook_strength ?? 0),
+        structureScore: Number(row.structure_score ?? 0),
+        informationDensityScore: Number(row.information_density_score ?? 0),
+        practicalityScore: Number(row.practicality_score ?? 0),
+        differentiationScore: Number(row.differentiation_score ?? 0),
+        seoPotentialScore: Number(row.seo_potential_score ?? 0),
+        audienceFitScore: Number(row.audience_fit_score ?? 0),
+      });
+      return {
+        postId: row.post_id as string,
+        blogId: row.blog_id as string,
+        blogName: row.blog_name as string,
+        title: (row.title as string | null) ?? (row.url as string),
+        url: row.url as string,
+        publishedAt: (row.published_at as string | null) ?? null,
+        qualityScore: quality.qualityScore,
+        qualityStatus: quality.qualityStatus,
+        topImprovements: safeJsonParse(row.improvements_json as string | null, [] as string[]).slice(0, 2),
+        summary: (row.summary as string | null) ?? null,
+      };
+    })
+    .sort((left, right) => left.qualityScore - right.qualityScore)
+    .slice(0, 8);
 
   return {
     blogs,
@@ -478,5 +543,6 @@ export const getDashboard = async (): Promise<DashboardResponse> => {
       blogId: (row.blog_id as string | null) ?? null,
       createdAt: row.created_at as string,
     })),
+    latestPostDiagnostics,
   };
 };
