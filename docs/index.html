@@ -1,263 +1,156 @@
-<!doctype html>
-<html lang="ko">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>BloManagent | 공개 블로그 진단 리포트</title>
-    <meta
-      name="description"
-      content="공개 블로그를 수집하고 검증된 게시글만 분석해 S~F 등급과 개선 포인트를 보여주는 BloManagent 공식 문서입니다."
-    >
-    <link rel="canonical" href="https://sheryloe.github.io/BloManagent/">
-    <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link
-      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap"
-      rel="stylesheet"
-    >
-    <link rel="stylesheet" href="./styles.css">
-  </head>
-  <body>
-    <div class="page-shell">
-      <header class="site-header">
-        <a class="brand" href="./index.html">
-          <span class="brand-mark">BM</span>
-          <span class="brand-copy">
-            <strong>BloManagent</strong>
-            <span>Public blog diagnostics workspace</span>
-          </span>
-        </a>
-
-        <nav class="topnav" aria-label="문서 탐색">
-          <a href="#summary">요약</a>
-          <a href="#pipeline">수집</a>
-          <a href="#analysis">분석</a>
-          <a href="#platforms">플랫폼</a>
-          <a href="#assets">복구</a>
-          <a href="./help.html">매뉴얼</a>
-          <a href="https://github.com/sheryloe/BloManagent">GitHub</a>
-        </nav>
-      </header>
-
-      <main class="report-layout">
-        <section class="report-hero">
-          <div class="hero-copy">
-            <p class="eyebrow">Report Cover</p>
-            <h1>공개 블로그 진단 리포트 워크스페이스</h1>
-            <p class="copy">
-              메인 URL 또는 게시글 URL 하나로 공개 블로그를 수집하고, 검증된 게시글만 대상으로
-              S~F 등급, 근거, 개선 작업을 보여줍니다.
-            </p>
-
-            <div class="action-row">
-              <a class="button button-primary" href="https://github.com/sheryloe/BloManagent">저장소 보기</a>
-              <a class="button button-secondary" href="./help.html">운영 매뉴얼</a>
-            </div>
-          </div>
-
-          <aside class="hero-side">
-            <article class="side-card">
-              <span class="side-label">Scoring</span>
-              <strong>Algorithm fixed</strong>
-              <p>등급 계산은 algorithm이 고정으로 맡습니다.</p>
-            </article>
-            <article class="side-card">
-              <span class="side-label">Workspace</span>
-              <strong>Resettable</strong>
-              <p>필요할 때 수집하고 끝나면 비웁니다.</p>
-            </article>
-            <article class="side-card image-card">
-              <img alt="BloManagent dashboard screenshot" src="./assets/screenshots/blomanagent-cover.png">
-            </article>
-          </aside>
-        </section>
-
-        <section class="report-section" id="summary">
-          <div class="section-head">
-            <p class="eyebrow">Summary</p>
-            <h2>현재 기준</h2>
-          </div>
-
-          <div class="stat-grid">
-            <article class="stat-card">
-              <span class="stat-label">입력</span>
-              <strong>메인 URL / 게시글 URL</strong>
-              <p>게시글 주소도 블로그 기준으로 정규화합니다.</p>
-            </article>
-            <article class="stat-card">
-              <span class="stat-label">집계</span>
-              <strong>Verified posts only</strong>
-              <p>집계와 분석에는 verified post만 포함합니다.</p>
-            </article>
-            <article class="stat-card">
-              <span class="stat-label">출력</span>
-              <strong>S ~ F grade</strong>
-              <p>내부 qualityScore를 등급으로 변환해 보여줍니다.</p>
-            </article>
-            <article class="stat-card">
-              <span class="stat-label">운영</span>
-              <strong>휘발성 워크스페이스</strong>
-              <p>최신 스냅샷만 유지하고 전체 초기화가 가능합니다.</p>
-            </article>
-          </div>
-        </section>
-
-        <section class="report-section" id="pipeline">
-          <div class="section-head">
-            <p class="eyebrow">Pipeline</p>
-            <h2>수집과 검증</h2>
-            <p>공개 데이터만 읽고 verified post만 분석 대상으로 올립니다.</p>
-          </div>
-
-          <div class="stage-grid">
-            <article class="stage-card">
-              <span class="stage-index">01</span>
-              <h3>Discovery</h3>
-              <p>RSS, sitemap, wp-json, HTML fallback 순서로 후보 URL을 찾습니다.</p>
-            </article>
-            <article class="stage-card">
-              <span class="stage-index">02</span>
-              <h3>Verification</h3>
-              <p>URL 규칙과 article marker 기준으로 verified와 excluded를 분리합니다.</p>
-            </article>
-            <article class="stage-card">
-              <span class="stage-index">03</span>
-              <h3>Analysis</h3>
-              <p>신호와 근거를 추출하고 5개 축 기준으로 qualityScore를 계산합니다.</p>
-            </article>
-            <article class="stage-card">
-              <span class="stage-index">04</span>
-              <h3>Reporting</h3>
-              <p>최신 리포트 한 건만 유지하고 Best/Worst와 분포를 보여줍니다.</p>
-            </article>
-          </div>
-
-          <div class="note-card">
-            <h3>티스토리 기준</h3>
-            <p>
-              RSS 우선, sitemap 보완, main fallback 최후 순서로 동작합니다. `category`, `tag`, `archive`, `guestbook`
-              류 URL은 집계 대상에서 제외합니다.
-            </p>
-          </div>
-        </section>
-
-        <section class="report-section" id="analysis">
-          <div class="section-head">
-            <p class="eyebrow">Analysis</p>
-            <h2>분석 모델</h2>
-          </div>
-
-          <div class="two-column">
-            <article class="table-card">
-              <h3>5개 상위 축</h3>
-              <ul class="list-block">
-                <li><strong>headline</strong>: 제목과 첫인상</li>
-                <li><strong>readability</strong>: 문단과 스캔성</li>
-                <li><strong>value</strong>: 예시와 실행 순서</li>
-                <li><strong>originality</strong>: 경험과 차별성</li>
-                <li><strong>search fit</strong>: 검색 의도와 FAQ</li>
-              </ul>
-            </article>
-            <article class="table-card">
-              <h3>출력 항목</h3>
-              <ul class="list-block">
-                <li>전체 등급 분포</li>
-                <li>Best / Worst 게시글 제목</li>
-                <li>강한 신호 / 약한 신호</li>
-                <li>신호별 근거와 개선 작업</li>
-                <li>실행 로그와 권장 액션</li>
-              </ul>
-            </article>
-          </div>
-        </section>
-
-        <section class="report-section" id="platforms">
-          <div class="section-head">
-            <p class="eyebrow">Platforms</p>
-            <h2>지원 플랫폼</h2>
-          </div>
-
-          <article class="table-card">
-            <table class="matrix">
-              <thead>
-                <tr>
-                  <th>플랫폼</th>
-                  <th>수집 방식</th>
-                  <th>기본 정책</th>
-                  <th>비고</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>Tistory</td>
-                  <td>RSS, sitemap, HTML</td>
-                  <td><span class="status-chip good">기본 지원</span></td>
-                  <td>strict verified-post 적용</td>
-                </tr>
-                <tr>
-                  <td>WordPress</td>
-                  <td>wp-json, RSS, sitemap, HTML</td>
-                  <td><span class="status-chip good">기본 지원</span></td>
-                  <td>공개 REST API 우선</td>
-                </tr>
-                <tr>
-                  <td>Blogger</td>
-                  <td>RSS/Atom, sitemap, HTML</td>
-                  <td><span class="status-chip good">기본 지원</span></td>
-                  <td>공개 피드 중심</td>
-                </tr>
-                <tr>
-                  <td>Naver Blog</td>
-                  <td>기본 비활성</td>
-                  <td><span class="status-chip watch">opt-in 필요</span></td>
-                  <td>정책 리스크 보수 대응</td>
-                </tr>
-              </tbody>
-            </table>
-          </article>
-        </section>
-
-        <section class="report-section" id="assets">
-          <div class="section-head">
-            <p class="eyebrow">Recovery</p>
-            <h2>복구 기준 문서</h2>
-          </div>
-
-          <div class="three-column">
-            <article class="table-card">
-              <h3>저장소</h3>
-              <ul class="list-block">
-                <li><code>README.md</code></li>
-                <li><code>명세서.md</code></li>
-                <li><code>docs/notion/BloManagent</code></li>
-              </ul>
-            </article>
-            <article class="table-card">
-              <h3>외부 자산</h3>
-              <ul class="list-block">
-                <li>GitHub Pages</li>
-                <li>GitHub wiki</li>
-                <li>Notion Step 1~6</li>
-              </ul>
-            </article>
-            <article class="table-card">
-              <h3>다음 순서</h3>
-              <ul class="list-block">
-                <li><code>명세서.md</code> 확인</li>
-                <li>최근 커밋 확인</li>
-                <li>wiki와 Step 원고 확인</li>
-                <li>필요 시 노션 재발행</li>
-              </ul>
-            </article>
-          </div>
-        </section>
-      </main>
-
-      <footer class="site-footer">
-        <span>BloManagent documentation</span>
-        <a href="./help.html">운영 매뉴얼로 이동</a>
-      </footer>
+<!DOCTYPE html>
+<html lang="ko" data-theme="business">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BloManagent | 공개 블로그를 진단하는 분석 서비스</title>
+  <meta name="description" content="공개 블로그 URL을 수집해 verified post 기준으로 품질 등급과 개선 포인트를 보여주는 분석 서비스">
+  <meta name="theme-color" content="#081320">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="BloManagent | 공개 블로그를 진단하는 분석 서비스">
+  <meta property="og:description" content="공개 블로그 URL 수집, verified post 분석, 품질 점수와 개선 액션을 보여주는 진단 워크스페이스">
+  <meta property="og:url" content="https://sheryloe.github.io/BloManagent/">
+  <meta property="og:image" content="https://sheryloe.github.io/BloManagent/assets/screenshots/blomanagent-cover.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.24/dist/full.min.css" rel="stylesheet" type="text/css">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    body {
+      font-family: "IBM Plex Sans KR", sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(14, 165, 233, 0.15), transparent 24rem),
+        radial-gradient(circle at top right, rgba(99, 102, 241, 0.12), transparent 24rem),
+        linear-gradient(180deg, #030914 0%, #071120 52%, #0b172a 100%);
+    }
+    .display-font { font-family: "Space Grotesk", sans-serif; }
+    .glass {
+      background: rgba(6, 16, 31, 0.8);
+      border: 1px solid rgba(125, 211, 252, 0.14);
+      box-shadow: 0 28px 60px rgba(0, 0, 0, 0.34);
+      backdrop-filter: blur(18px);
+    }
+  </style>
+</head>
+<body class="text-slate-100">
+  <header class="sticky top-0 z-50 border-b border-white/10 bg-slate-950/70 backdrop-blur">
+    <div class="mx-auto flex max-w-7xl items-center justify-between gap-4 px-6 py-4">
+      <a href="#top" class="flex items-center gap-3">
+        <div class="flex h-11 w-11 items-center justify-center rounded-2xl bg-sky-300 text-slate-950 shadow-lg shadow-sky-400/25">
+          <span class="display-font text-lg font-bold">BM</span>
+        </div>
+        <div>
+          <p class="display-font text-lg font-bold">BloManagent</p>
+          <p class="text-xs uppercase tracking-[0.24em] text-sky-200/70">Blog diagnostics workspace</p>
+        </div>
+      </a>
+      <nav class="hidden gap-3 md:flex">
+        <a class="btn btn-ghost btn-sm text-slate-100" href="#score">스코어</a>
+        <a class="btn btn-ghost btn-sm text-slate-100" href="#pipeline">파이프라인</a>
+        <a class="btn btn-ghost btn-sm text-slate-100" href="#todo">TODO</a>
+        <a class="btn btn-info btn-sm text-slate-950" href="https://github.com/sheryloe/BloManagent">GitHub</a>
+      </nav>
     </div>
-  </body>
+  </header>
+
+  <main id="top" class="mx-auto flex max-w-7xl flex-col gap-10 px-6 pb-24 pt-10">
+    <section class="grid gap-6 lg:grid-cols-[1.02fr_0.98fr]">
+      <div class="glass rounded-[2rem] p-8 lg:p-10">
+        <span class="badge badge-info badge-outline mb-5">Analytics service</span>
+        <h1 class="display-font max-w-3xl text-4xl font-black leading-tight text-white md:text-6xl">
+          공개 블로그를
+          점수와 근거로
+          진단하는
+          서비스형 워크스페이스
+        </h1>
+        <p class="mt-6 max-w-2xl text-lg leading-8 text-slate-300">
+          BloManagent는 URL만 받아도 공개 블로그를 수집하고,
+          verified post만 기준으로 품질 점수와 개선 포인트를 보여주도록 설계된 분석 서비스입니다.
+          핵심은 “예쁘게 보이기”가 아니라 “왜 이 점수가 나왔는지 설명 가능한가”입니다.
+        </p>
+        <div class="mt-7 flex flex-wrap gap-3">
+          <a class="btn btn-info text-slate-950" href="https://github.com/sheryloe/BloManagent">저장소 보기</a>
+          <a class="btn btn-outline text-slate-100" href="./help.html">도움말</a>
+        </div>
+        <div class="mt-8 grid gap-3 sm:grid-cols-3">
+          <div class="rounded-2xl bg-sky-400/10 p-4 ring-1 ring-sky-300/20">
+            <p class="text-xs uppercase tracking-[0.2em] text-sky-200">Input</p>
+            <p class="mt-2 font-semibold text-white">메인 URL / 게시글 URL</p>
+          </div>
+          <div class="rounded-2xl bg-emerald-400/10 p-4 ring-1 ring-emerald-300/20">
+            <p class="text-xs uppercase tracking-[0.2em] text-emerald-200">Rule</p>
+            <p class="mt-2 font-semibold text-white">verified post only</p>
+          </div>
+          <div class="rounded-2xl bg-violet-400/10 p-4 ring-1 ring-violet-300/20">
+            <p class="text-xs uppercase tracking-[0.2em] text-violet-200">Output</p>
+            <p class="mt-2 font-semibold text-white">S ~ F 등급 + 개선 액션</p>
+          </div>
+        </div>
+      </div>
+      <figure class="glass overflow-hidden rounded-[2rem] p-4">
+        <img class="w-full rounded-[1.5rem] object-cover" src="assets/screenshots/blomanagent-cover.png" alt="BloManagent dashboard">
+      </figure>
+    </section>
+
+    <section id="score" class="grid gap-5 lg:grid-cols-4">
+      <article class="glass rounded-[1.75rem] p-6">
+        <i data-lucide="scan-search" class="h-8 w-8 text-sky-300"></i>
+        <h2 class="display-font mt-4 text-2xl font-bold text-white">Discovery</h2>
+        <p class="mt-3 text-slate-300">RSS, sitemap, wp-json, HTML fallback을 순서대로 시도합니다.</p>
+      </article>
+      <article class="glass rounded-[1.75rem] p-6">
+        <i data-lucide="filter" class="h-8 w-8 text-sky-300"></i>
+        <h2 class="display-font mt-4 text-2xl font-bold text-white">Verification</h2>
+        <p class="mt-3 text-slate-300">카테고리, 태그, 아카이브를 제외하고 실제 게시글만 집계합니다.</p>
+      </article>
+      <article class="glass rounded-[1.75rem] p-6">
+        <i data-lucide="badge-percent" class="h-8 w-8 text-sky-300"></i>
+        <h2 class="display-font mt-4 text-2xl font-bold text-white">Scoring</h2>
+        <p class="mt-3 text-slate-300">headline, readability, value, originality, search fit을 조합합니다.</p>
+      </article>
+      <article class="glass rounded-[1.75rem] p-6">
+        <i data-lucide="sparkles" class="h-8 w-8 text-sky-300"></i>
+        <h2 class="display-font mt-4 text-2xl font-bold text-white">Recommendation</h2>
+        <p class="mt-3 text-slate-300">AI는 점수 계산이 아니라 설명 보강과 개선 액션 생성에 사용합니다.</p>
+      </article>
+    </section>
+
+    <section id="pipeline" class="glass rounded-[2rem] p-8 lg:p-10">
+      <div class="max-w-3xl">
+        <span class="badge badge-outline badge-info">Pipeline</span>
+        <h2 class="display-font mt-4 text-3xl font-black text-white md:text-4xl">분석은 수집보다 정제가 더 중요합니다</h2>
+      </div>
+      <div class="mt-8 grid gap-4 lg:grid-cols-4">
+        <div class="rounded-2xl border border-white/10 bg-white/5 p-5"><p class="font-semibold text-sky-200">01 Collect</p><p class="mt-2 text-white">공개 영역만 수집합니다.</p></div>
+        <div class="rounded-2xl border border-white/10 bg-white/5 p-5"><p class="font-semibold text-sky-200">02 Verify</p><p class="mt-2 text-white">진짜 게시글만 남깁니다.</p></div>
+        <div class="rounded-2xl border border-white/10 bg-white/5 p-5"><p class="font-semibold text-sky-200">03 Score</p><p class="mt-2 text-white">알고리즘 기준으로 등급을 계산합니다.</p></div>
+        <div class="rounded-2xl border border-white/10 bg-white/5 p-5"><p class="font-semibold text-sky-200">04 Explain</p><p class="mt-2 text-white">근거와 개선 포인트를 리포트로 보여줍니다.</p></div>
+      </div>
+    </section>
+
+    <section id="todo" class="grid gap-5 lg:grid-cols-3">
+      <article class="glass rounded-[1.75rem] p-6">
+        <span class="badge badge-warning">Product</span>
+        <h2 class="display-font mt-4 text-2xl font-bold text-white">공유 가능한 리포트</h2>
+        <p class="mt-3 text-slate-300">분석 결과를 링크나 파일로 쉽게 공유할 수 있어야 서비스 가치가 커집니다.</p>
+      </article>
+      <article class="glass rounded-[1.75rem] p-6">
+        <span class="badge badge-success">Data</span>
+        <h2 class="display-font mt-4 text-2xl font-bold text-white">기간별 비교</h2>
+        <p class="mt-3 text-slate-300">같은 블로그를 주기적으로 비교해 개선 추세를 볼 수 있게 해야 합니다.</p>
+      </article>
+      <article class="glass rounded-[1.75rem] p-6">
+        <span class="badge badge-info">Ops</span>
+        <h2 class="display-font mt-4 text-2xl font-bold text-white">비동기 분석 큐</h2>
+        <p class="mt-3 text-slate-300">긴 수집과 분석을 큐 기반으로 돌리면 서비스 품질과 안정성이 좋아집니다.</p>
+      </article>
+    </section>
+  </main>
+
+  <script>lucide.createIcons();</script>
+</body>
 </html>
